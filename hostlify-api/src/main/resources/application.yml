@@ -1,0 +1,18 @@
+spring:
+  profiles:
+    active: dev
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:default_secret_fallback_key_min_32_chars}
+    access-expiry-ms: 86400000
+    refresh-expiry-ms: 604800000
+    superadmin-expiry-ms: 28800000
+  frontend-url: http://localhost:5173

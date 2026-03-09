@@ -1,0 +1,16 @@
+spring:
+  flyway:
+    clean-disabled: false
+  datasource:
+    url: jdbc:mysql://localhost:3306/hostlify_db?createDatabaseIfNotExist=true&useSSL=false
+    username: root
+    password: root
+app:
+  jwt:
+    secret: dev_secret_key_min_32_chars_long_here
+notification:
+  skip-email: true
+  skip-sms: true
+logging:
+  level:
+    com.hostlify: DEBUG

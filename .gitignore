@@ -1,0 +1,34 @@
+# Eclipse / IntelliJ / IDE
+/.metadata/
+.classpath
+.factorypath
+.project
+.settings/
+*.iml
+.idea/
+
+# Maven build output
+target/
+bin/
+
+# Logs
+*.log
+
+# Python scripts (build utilities, not source)
+*.py
+
+# DB schema dumps
+db_schema.txt
+db_schema_utf8.txt
+
+# Spring Boot local config overrides
+application-local.yml
+application-local.properties
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Outer pom.xml (only the inner hostlify-api/pom.xml is the real project)
+/pom.xml
+/Hostlify_DB_Schema.docx

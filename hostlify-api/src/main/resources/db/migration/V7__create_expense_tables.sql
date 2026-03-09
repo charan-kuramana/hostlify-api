@@ -1,0 +1,62 @@
+CREATE TABLE expense_records (
+  id             BIGINT         NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  hostel_id      BIGINT         NOT NULL,
+  category       VARCHAR(30)    NOT NULL,
+  amount         DECIMAL(12, 2) NOT NULL,
+  description    VARCHAR(500),
+  vendor_name    VARCHAR(200),
+  invoice_number VARCHAR(100),
+  invoice_url    VARCHAR(500),
+  expense_date   DATE           NOT NULL,
+  period_month   INT            NOT NULL,
+  period_year    INT            NOT NULL,
+  recorded_by    BIGINT         NOT NULL,
+  created_at     DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at     DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  is_deleted     TINYINT(1)     NOT NULL DEFAULT 0,
+  deleted_at     DATETIME       DEFAULT NULL,
+  CONSTRAINT fk_er_hostel  FOREIGN KEY (hostel_id) REFERENCES hostel_hostels (id),
+  INDEX idx_er_hostel_id   (hostel_id),
+  INDEX idx_er_period      (period_year, period_month),
+  INDEX idx_er_category    (category)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE expense_employees (
+  id            BIGINT         NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  hostel_id     BIGINT         NOT NULL,
+  employee_code VARCHAR(30),
+  name          VARCHAR(150)   NOT NULL,
+  role          VARCHAR(80)    NOT NULL,
+  mobile        VARCHAR(15),
+  base_salary   DECIMAL(12, 2) NOT NULL,
+  hra           DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
+  created_at    DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at    DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  is_deleted    TINYINT(1)     NOT NULL DEFAULT 0,
+  deleted_at    DATETIME       DEFAULT NULL,
+  CONSTRAINT fk_ee_hostel  FOREIGN KEY (hostel_id) REFERENCES hostel_hostels (id),
+  INDEX idx_ee_hostel_id   (hostel_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE expense_salary_records (
+  id           BIGINT         NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  employee_id  BIGINT         NOT NULL,
+  hostel_id    BIGINT         NOT NULL,
+  period_month INT            NOT NULL,
+  period_year  INT            NOT NULL,
+  gross_salary DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
+  deductions   DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
+  net_salary   DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
+  status       VARCHAR(20)    NOT NULL DEFAULT 'PENDING',
+  paid_at      DATETIME,
+  created_at   DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at   DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  is_deleted   TINYINT(1)     NOT NULL DEFAULT 0,
+  deleted_at   DATETIME       DEFAULT NULL,
+  CONSTRAINT fk_esr_employee  FOREIGN KEY (employee_id) REFERENCES expense_employees (id),
+  CONSTRAINT fk_esr_hostel    FOREIGN KEY (hostel_id)   REFERENCES hostel_hostels (id),
+  INDEX idx_esr_employee_id   (employee_id),
+  INDEX idx_esr_hostel_id     (hostel_id),
+  INDEX idx_esr_period        (period_year, period_month),
+  INDEX idx_esr_status        (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
