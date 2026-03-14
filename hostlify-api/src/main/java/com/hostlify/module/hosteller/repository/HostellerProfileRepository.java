@@ -13,4 +13,6 @@ public interface HostellerProfileRepository extends JpaRepository<HostellerProfi
     Optional<HostellerProfile> findByEmail(String email);
     Optional<HostellerProfile> findByMobile(String mobile);
     List<HostellerProfile> findByHostelId(Long hostelId);
+    List<HostellerProfile> findByStatusOrderByCreatedAtDesc(String status);
+    List<HostellerProfile> findByHostelIdAndStatusOrderByCreatedAtDesc(Long hostelId, String status);
 }

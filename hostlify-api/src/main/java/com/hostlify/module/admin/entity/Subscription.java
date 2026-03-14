@@ -2,10 +2,14 @@ package com.hostlify.module.admin.entity;
 
 import com.hostlify.shared.entity.BaseEntity;
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 import org.hibernate.annotations.SQLRestriction;
 
 import java.math.BigDecimal;
 
+@Getter
+@Setter
 @Entity
 @Table(
     name = "admin_subscriptions",
@@ -32,17 +36,4 @@ public class Subscription extends BaseEntity {
 
     @Column(name = "price_monthly", nullable = false, precision = 12, scale = 2)
     private BigDecimal priceMonthly = BigDecimal.ZERO;
-
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    public Long getOwnerId() { return ownerId; }
-    public void setOwnerId(Long ownerId) { this.ownerId = ownerId; }
-    public String getPlanName() { return planName; }
-    public void setPlanName(String planName) { this.planName = planName; }
-    public int getMaxHostels() { return maxHostels; }
-    public void setMaxHostels(int maxHostels) { this.maxHostels = maxHostels; }
-    public int getMaxBeds() { return maxBeds; }
-    public void setMaxBeds(int maxBeds) { this.maxBeds = maxBeds; }
-    public BigDecimal getPriceMonthly() { return priceMonthly; }
-    public void setPriceMonthly(BigDecimal priceMonthly) { this.priceMonthly = priceMonthly; }
 }

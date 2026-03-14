@@ -2,10 +2,14 @@ package com.hostlify.module.referral.entity;
 
 import com.hostlify.shared.entity.BaseEntity;
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 import org.hibernate.annotations.SQLRestriction;
 
 import java.math.BigDecimal;
 
+@Getter
+@Setter
 @Entity
 @Table(
     name = "referral_codes",
@@ -30,15 +34,4 @@ public class ReferralCode extends BaseEntity {
 
     @Column(name = "total_discount_earned", nullable = false, precision = 12, scale = 2)
     private BigDecimal totalDiscountEarned = BigDecimal.ZERO;
-
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    public Long getHostellerId() { return hostellerId; }
-    public void setHostellerId(Long hostellerId) { this.hostellerId = hostellerId; }
-    public String getCode() { return code; }
-    public void setCode(String code) { this.code = code; }
-    public int getTotalReferrals() { return totalReferrals; }
-    public void setTotalReferrals(int totalReferrals) { this.totalReferrals = totalReferrals; }
-    public BigDecimal getTotalDiscountEarned() { return totalDiscountEarned; }
-    public void setTotalDiscountEarned(BigDecimal totalDiscountEarned) { this.totalDiscountEarned = totalDiscountEarned; }
 }

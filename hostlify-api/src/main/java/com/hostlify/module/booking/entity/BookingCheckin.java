@@ -2,11 +2,15 @@ package com.hostlify.module.booking.entity;
 
 import com.hostlify.shared.entity.BaseEntity;
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 import org.hibernate.annotations.SQLRestriction;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
+@Getter
+@Setter
 @Entity
 @Table(
     name = "booking_checkins",
@@ -62,33 +66,4 @@ public class BookingCheckin extends BaseEntity {
 
     @Column(name = "checkout_reason", columnDefinition = "TEXT")
     private String checkoutReason;
-
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    public Long getHostellerId() { return hostellerId; }
-    public void setHostellerId(Long hostellerId) { this.hostellerId = hostellerId; }
-    public Long getHostelId() { return hostelId; }
-    public void setHostelId(Long hostelId) { this.hostelId = hostelId; }
-    public Long getFloorId() { return floorId; }
-    public void setFloorId(Long floorId) { this.floorId = floorId; }
-    public Long getRoomId() { return roomId; }
-    public void setRoomId(Long roomId) { this.roomId = roomId; }
-    public Long getBedId() { return bedId; }
-    public void setBedId(Long bedId) { this.bedId = bedId; }
-    public LocalDate getCheckinDate() { return checkinDate; }
-    public void setCheckinDate(LocalDate checkinDate) { this.checkinDate = checkinDate; }
-    public LocalDate getCheckoutDate() { return checkoutDate; }
-    public void setCheckoutDate(LocalDate checkoutDate) { this.checkoutDate = checkoutDate; }
-    public BigDecimal getRentAmount() { return rentAmount; }
-    public void setRentAmount(BigDecimal rentAmount) { this.rentAmount = rentAmount; }
-    public String getRentFrequency() { return rentFrequency; }
-    public void setRentFrequency(String rentFrequency) { this.rentFrequency = rentFrequency; }
-    public Integer getCustomFrequencyDays() { return customFrequencyDays; }
-    public void setCustomFrequencyDays(Integer customFrequencyDays) { this.customFrequencyDays = customFrequencyDays; }
-    public BigDecimal getAdvanceAmount() { return advanceAmount; }
-    public void setAdvanceAmount(BigDecimal advanceAmount) { this.advanceAmount = advanceAmount; }
-    public String getStatus() { return status; }
-    public void setStatus(String status) { this.status = status; }
-    public String getCheckoutReason() { return checkoutReason; }
-    public void setCheckoutReason(String checkoutReason) { this.checkoutReason = checkoutReason; }
 }

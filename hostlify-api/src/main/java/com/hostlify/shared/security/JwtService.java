@@ -20,24 +20,62 @@ public class JwtService {
     @Value("${app.jwt.secret}")
     private String secretKey;
 
-    @Value("${app.jwt.access-expiry-ms}")
-    private long jwtExpiration;
+    @Value("${app.jwt.hosteller-expiry-ms:86400000}")
+    private long hostellerExpiry;
 
-    @Value("${app.jwt.refresh-expiry-ms}")
-    private long jwtRefreshExpiration;
+    @Value("${app.jwt.staff-expiry-ms:86400000}")
+    private long staffExpiry;
+
+    @Value("${app.jwt.superadmin-expiry-ms:28800000}")
+    private long superadminExpiry;
+
+    @Value("${app.jwt.refresh-expiry-ms:2592000000}")
+    private long refreshExpiry;
 
     private SecretKey getSignInKey() {
         byte[] keyBytes = secretKey.getBytes(StandardCharsets.UTF_8);
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
+    public String generateHostellerToken(AuthUser user, Map<String, Object> claims) {
+        claims.put("role", user.getRole());
+        claims.put("name", user.getEmail());
+        claims.put("userId", user.getId());
+        claims.put("status", user.getStatus());
+        return buildToken(claims, user.getUuid(), hostellerExpiry);
+    }
+
+    public String generateStaffToken(AuthUser user, Map<String, Object> claims) {
+        claims.put("role", user.getRole());
+        claims.put("sub_role", user.getSubRole());
+        claims.put("name", user.getEmail());
+        claims.put("userId", user.getId());
+        claims.put("status", user.getStatus());
+        return buildToken(claims, user.getUuid(), staffExpiry);
+    }
+
+    public String generateSuperAdminToken(AuthUser user) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("role", user.getRole());
+        claims.put("name", user.getEmail());
+        claims.put("userId", user.getId());
+        claims.put("status", user.getStatus());
+        claims.put("permissions", java.util.List.of("ALL"));
+        return buildToken(claims, user.getUuid(), superadminExpiry);
+    }
+
+    // Keep for backward compatibility
     public String generateAccessToken(AuthUser user, Map<String, Object> claims) {
         claims.put("role", user.getRole());
-        return buildToken(claims, user.getUuid(), jwtExpiration);
+        claims.put("userId", user.getId());
+        claims.put("status", user.getStatus());
+        long expiry = "SUPER_ADMIN".equals(user.getRole()) ? superadminExpiry :
+                      "HOSTEL_STAFF".equals(user.getRole()) ? staffExpiry : hostellerExpiry;
+        return buildToken(claims, user.getUuid(), expiry);
     }
 
     public String generateRefreshToken(AuthUser user) {
-        return buildToken(new HashMap<>(), user.getUuid(), jwtRefreshExpiration);
+        return buildToken(new HashMap<>(), user.getUuid(), refreshExpiry);
     }
 
     private String buildToken(Map<String, Object> extraClaims, String subject, long expiration) {

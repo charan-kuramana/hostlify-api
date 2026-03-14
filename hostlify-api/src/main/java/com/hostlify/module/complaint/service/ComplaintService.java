@@ -1,10 +1,14 @@
 package com.hostlify.module.complaint.service;
 
+import com.hostlify.module.auth.repository.AuthUserRepository;
 import com.hostlify.module.complaint.entity.ComplaintMaintenance;
 import com.hostlify.module.complaint.entity.ComplaintRecord;
+import com.hostlify.module.complaint.event.ComplaintResolvedEvent;
 import com.hostlify.module.complaint.repository.ComplaintMaintenanceRepository;
 import com.hostlify.module.complaint.repository.ComplaintRecordRepository;
+import com.hostlify.module.hosteller.repository.HostellerProfileRepository;
 import com.hostlify.shared.exception.AppException;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,11 +21,20 @@ public class ComplaintService {
 
     private final ComplaintRecordRepository complaintRepo;
     private final ComplaintMaintenanceRepository maintenanceRepo;
+    private final ApplicationEventPublisher eventPublisher;
+    private final HostellerProfileRepository profileRepo;
+    private final AuthUserRepository authUserRepo;
 
     public ComplaintService(ComplaintRecordRepository complaintRepo,
-                            ComplaintMaintenanceRepository maintenanceRepo) {
+                            ComplaintMaintenanceRepository maintenanceRepo,
+                            ApplicationEventPublisher eventPublisher,
+                            HostellerProfileRepository profileRepo,
+                            AuthUserRepository authUserRepo) {
         this.complaintRepo = complaintRepo;
         this.maintenanceRepo = maintenanceRepo;
+        this.eventPublisher = eventPublisher;
+        this.profileRepo = profileRepo;
+        this.authUserRepo = authUserRepo;
     }
 
     public List<ComplaintRecord> getComplaintsByHostel(Long hostelId) {
@@ -48,7 +61,15 @@ public class ComplaintService {
         complaint.setStatus("RESOLVED");
         complaint.setAssignedTo(resolvedBy);
         complaint.setResolvedAt(LocalDateTime.now());
-        return complaintRepo.save(complaint);
+        ComplaintRecord saved = complaintRepo.save(complaint);
+
+        // Publish notification event
+        profileRepo.findById(saved.getHostellerId()).ifPresent(profile ->
+                authUserRepo.findById(profile.getAuthUserId()).ifPresent(authUser ->
+                        eventPublisher.publishEvent(new ComplaintResolvedEvent(
+                                this, saved, authUser.getEmail(), profile.getFirstName()))));
+
+        return saved;
     }
 
     public List<ComplaintMaintenance> getMaintenanceByHostel(Long hostelId) {

@@ -1,7 +1,9 @@
 package com.hostlify.shared.exception;
 
+import lombok.Getter;
 import org.springframework.http.HttpStatus;
 
+@Getter
 public class AppException extends RuntimeException {
     private final HttpStatus status;
     private final String errorCode;
@@ -17,7 +19,4 @@ public class AppException extends RuntimeException {
         this.status = status;
         this.errorCode = errorCode;
     }
-
-    public HttpStatus getStatus() { return status; }
-    public String getErrorCode() { return errorCode; }
 }

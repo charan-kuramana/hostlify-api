@@ -2,10 +2,14 @@ package com.hostlify.module.service.entity;
 
 import com.hostlify.shared.entity.BaseEntity;
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 import org.hibernate.annotations.SQLRestriction;
 
 import java.time.LocalDateTime;
 
+@Getter
+@Setter
 @Entity
 @Table(
     name = "service_parking",
@@ -41,21 +45,4 @@ public class ParkingRecord extends BaseEntity {
 
     @Column(name = "registered_at", nullable = false)
     private LocalDateTime registeredAt;
-
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    public Long getHostellerId() { return hostellerId; }
-    public void setHostellerId(Long hostellerId) { this.hostellerId = hostellerId; }
-    public Long getHostelId() { return hostelId; }
-    public void setHostelId(Long hostelId) { this.hostelId = hostelId; }
-    public String getVehicleNumber() { return vehicleNumber; }
-    public void setVehicleNumber(String vehicleNumber) { this.vehicleNumber = vehicleNumber; }
-    public String getVehicleType() { return vehicleType; }
-    public void setVehicleType(String vehicleType) { this.vehicleType = vehicleType; }
-    public String getSlotNumber() { return slotNumber; }
-    public void setSlotNumber(String slotNumber) { this.slotNumber = slotNumber; }
-    public String getStatus() { return status; }
-    public void setStatus(String status) { this.status = status; }
-    public LocalDateTime getRegisteredAt() { return registeredAt; }
-    public void setRegisteredAt(LocalDateTime registeredAt) { this.registeredAt = registeredAt; }
 }

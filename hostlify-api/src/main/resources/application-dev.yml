@@ -1,16 +1,20 @@
 spring:
-  flyway:
-    clean-disabled: false
   datasource:
-    url: jdbc:mysql://localhost:3306/hostlify_db?createDatabaseIfNotExist=true&useSSL=false
+    url: jdbc:mysql://localhost:3306/hostlify_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Kolkata
     username: root
     password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    show-sql: true
+
 app:
   jwt:
-    secret: dev_secret_key_min_32_chars_long_here
-notification:
-  skip-email: true
-  skip-sms: true
+    secret: dev_secret_key_min_32_chars_long_here_abcdef1234567890
+  notification:
+    skip-email: true
+    skip-sms: true
+
 logging:
   level:
     com.hostlify: DEBUG
+    org.hibernate.SQL: DEBUG

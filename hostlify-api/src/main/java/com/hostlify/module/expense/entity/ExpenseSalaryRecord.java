@@ -2,11 +2,15 @@ package com.hostlify.module.expense.entity;
 
 import com.hostlify.shared.entity.BaseEntity;
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 import org.hibernate.annotations.SQLRestriction;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+@Getter
+@Setter
 @Entity
 @Table(
     name = "expense_salary_records",
@@ -50,25 +54,4 @@ public class ExpenseSalaryRecord extends BaseEntity {
 
     @Column(name = "paid_at")
     private LocalDateTime paidAt;
-
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    public Long getEmployeeId() { return employeeId; }
-    public void setEmployeeId(Long employeeId) { this.employeeId = employeeId; }
-    public Long getHostelId() { return hostelId; }
-    public void setHostelId(Long hostelId) { this.hostelId = hostelId; }
-    public int getPeriodMonth() { return periodMonth; }
-    public void setPeriodMonth(int periodMonth) { this.periodMonth = periodMonth; }
-    public int getPeriodYear() { return periodYear; }
-    public void setPeriodYear(int periodYear) { this.periodYear = periodYear; }
-    public BigDecimal getGrossSalary() { return grossSalary; }
-    public void setGrossSalary(BigDecimal grossSalary) { this.grossSalary = grossSalary; }
-    public BigDecimal getDeductions() { return deductions; }
-    public void setDeductions(BigDecimal deductions) { this.deductions = deductions; }
-    public BigDecimal getNetSalary() { return netSalary; }
-    public void setNetSalary(BigDecimal netSalary) { this.netSalary = netSalary; }
-    public String getStatus() { return status; }
-    public void setStatus(String status) { this.status = status; }
-    public LocalDateTime getPaidAt() { return paidAt; }
-    public void setPaidAt(LocalDateTime paidAt) { this.paidAt = paidAt; }
 }

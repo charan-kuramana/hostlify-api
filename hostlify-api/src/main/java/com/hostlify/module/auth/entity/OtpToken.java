@@ -2,9 +2,13 @@ package com.hostlify.module.auth.entity;
 
 import com.hostlify.shared.entity.BaseEntity;
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.time.LocalDateTime;
 
+@Getter
+@Setter
 @Entity
 @Table(
     name = "auth_otp_tokens",
@@ -33,17 +37,4 @@ public class OtpToken extends BaseEntity {
 
     @Column(name = "is_used", nullable = false)
     private boolean isUsed = false;
-
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    public Long getUserId() { return userId; }
-    public void setUserId(Long userId) { this.userId = userId; }
-    public String getOtpCode() { return otpCode; }
-    public void setOtpCode(String otpCode) { this.otpCode = otpCode; }
-    public String getPurpose() { return purpose; }
-    public void setPurpose(String purpose) { this.purpose = purpose; }
-    public LocalDateTime getExpiresAt() { return expiresAt; }
-    public void setExpiresAt(LocalDateTime expiresAt) { this.expiresAt = expiresAt; }
-    public boolean isIsUsed() { return isUsed; }
-    public void setIsUsed(boolean isUsed) { this.isUsed = isUsed; }
 }

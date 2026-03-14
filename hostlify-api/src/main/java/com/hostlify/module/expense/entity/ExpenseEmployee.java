@@ -2,10 +2,14 @@ package com.hostlify.module.expense.entity;
 
 import com.hostlify.shared.entity.BaseEntity;
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 import org.hibernate.annotations.SQLRestriction;
 
 import java.math.BigDecimal;
 
+@Getter
+@Setter
 @Entity
 @Table(
     name = "expense_employees",
@@ -38,21 +42,4 @@ public class ExpenseEmployee extends BaseEntity {
 
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal hra = BigDecimal.ZERO;
-
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    public Long getHostelId() { return hostelId; }
-    public void setHostelId(Long hostelId) { this.hostelId = hostelId; }
-    public String getEmployeeCode() { return employeeCode; }
-    public void setEmployeeCode(String employeeCode) { this.employeeCode = employeeCode; }
-    public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
-    public String getRole() { return role; }
-    public void setRole(String role) { this.role = role; }
-    public String getMobile() { return mobile; }
-    public void setMobile(String mobile) { this.mobile = mobile; }
-    public BigDecimal getBaseSalary() { return baseSalary; }
-    public void setBaseSalary(BigDecimal baseSalary) { this.baseSalary = baseSalary; }
-    public BigDecimal getHra() { return hra; }
-    public void setHra(BigDecimal hra) { this.hra = hra; }
 }

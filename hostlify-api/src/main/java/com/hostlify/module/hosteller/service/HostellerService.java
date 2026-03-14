@@ -41,4 +41,18 @@ public class HostellerService {
         existing.setDateOfBirth(req.getDateOfBirth());
         return profileRepo.save(existing);
     }
+
+    @Transactional
+    public HostellerProfile savePhotoUrl(Long hostellerId, String blobPath) {
+        HostellerProfile profile = getById(hostellerId);
+        profile.setPhotoUrl(blobPath);
+        return profileRepo.save(profile);
+    }
+
+    @Transactional
+    public HostellerProfile saveIdProofUrl(Long hostellerId, String blobPath) {
+        HostellerProfile profile = getById(hostellerId);
+        profile.setIdProofUrl(blobPath);
+        return profileRepo.save(profile);
+    }
 }

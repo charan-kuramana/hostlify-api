@@ -2,8 +2,12 @@ package com.hostlify.module.menu.entity;
 
 import com.hostlify.shared.entity.BaseEntity;
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 import org.hibernate.annotations.SQLRestriction;
 
+@Getter
+@Setter
 @Entity
 @Table(
     name = "menu_items",
@@ -30,17 +34,4 @@ public class MenuItem extends BaseEntity {
 
     @Column(length = 50)
     private String timing;
-
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    public Long getMenuId() { return menuId; }
-    public void setMenuId(Long menuId) { this.menuId = menuId; }
-    public String getDayOfWeek() { return dayOfWeek; }
-    public void setDayOfWeek(String dayOfWeek) { this.dayOfWeek = dayOfWeek; }
-    public String getMealType() { return mealType; }
-    public void setMealType(String mealType) { this.mealType = mealType; }
-    public String getItems() { return items; }
-    public void setItems(String items) { this.items = items; }
-    public String getTiming() { return timing; }
-    public void setTiming(String timing) { this.timing = timing; }
 }

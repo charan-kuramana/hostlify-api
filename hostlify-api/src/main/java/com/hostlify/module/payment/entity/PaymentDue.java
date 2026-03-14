@@ -2,11 +2,15 @@ package com.hostlify.module.payment.entity;
 
 import com.hostlify.shared.entity.BaseEntity;
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 import org.hibernate.annotations.SQLRestriction;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
+@Getter
+@Setter
 @Entity
 @Table(
     name = "payment_dues",
@@ -47,23 +51,4 @@ public class PaymentDue extends BaseEntity {
 
     @Column(nullable = false, length = 20)
     private String status = "UNPAID";
-
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    public Long getHostellerId() { return hostellerId; }
-    public void setHostellerId(Long hostellerId) { this.hostellerId = hostellerId; }
-    public Long getBookingId() { return bookingId; }
-    public void setBookingId(Long bookingId) { this.bookingId = bookingId; }
-    public Long getHostelId() { return hostelId; }
-    public void setHostelId(Long hostelId) { this.hostelId = hostelId; }
-    public int getPeriodMonth() { return periodMonth; }
-    public void setPeriodMonth(int periodMonth) { this.periodMonth = periodMonth; }
-    public int getPeriodYear() { return periodYear; }
-    public void setPeriodYear(int periodYear) { this.periodYear = periodYear; }
-    public LocalDate getDueDate() { return dueDate; }
-    public void setDueDate(LocalDate dueDate) { this.dueDate = dueDate; }
-    public BigDecimal getRentAmount() { return rentAmount; }
-    public void setRentAmount(BigDecimal rentAmount) { this.rentAmount = rentAmount; }
-    public String getStatus() { return status; }
-    public void setStatus(String status) { this.status = status; }
 }

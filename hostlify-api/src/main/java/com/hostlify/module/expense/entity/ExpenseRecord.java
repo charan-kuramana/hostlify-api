@@ -2,11 +2,15 @@ package com.hostlify.module.expense.entity;
 
 import com.hostlify.shared.entity.BaseEntity;
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 import org.hibernate.annotations.SQLRestriction;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
+@Getter
+@Setter
 @Entity
 @Table(
     name = "expense_records",
@@ -55,29 +59,4 @@ public class ExpenseRecord extends BaseEntity {
 
     @Column(name = "recorded_by", nullable = false)
     private Long recordedBy;
-
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    public Long getHostelId() { return hostelId; }
-    public void setHostelId(Long hostelId) { this.hostelId = hostelId; }
-    public String getCategory() { return category; }
-    public void setCategory(String category) { this.category = category; }
-    public BigDecimal getAmount() { return amount; }
-    public void setAmount(BigDecimal amount) { this.amount = amount; }
-    public String getDescription() { return description; }
-    public void setDescription(String description) { this.description = description; }
-    public String getVendorName() { return vendorName; }
-    public void setVendorName(String vendorName) { this.vendorName = vendorName; }
-    public String getInvoiceNumber() { return invoiceNumber; }
-    public void setInvoiceNumber(String invoiceNumber) { this.invoiceNumber = invoiceNumber; }
-    public String getInvoiceUrl() { return invoiceUrl; }
-    public void setInvoiceUrl(String invoiceUrl) { this.invoiceUrl = invoiceUrl; }
-    public LocalDate getExpenseDate() { return expenseDate; }
-    public void setExpenseDate(LocalDate expenseDate) { this.expenseDate = expenseDate; }
-    public int getPeriodMonth() { return periodMonth; }
-    public void setPeriodMonth(int periodMonth) { this.periodMonth = periodMonth; }
-    public int getPeriodYear() { return periodYear; }
-    public void setPeriodYear(int periodYear) { this.periodYear = periodYear; }
-    public Long getRecordedBy() { return recordedBy; }
-    public void setRecordedBy(Long recordedBy) { this.recordedBy = recordedBy; }
 }

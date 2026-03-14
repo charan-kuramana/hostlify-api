@@ -2,9 +2,13 @@ package com.hostlify.module.auth.entity;
 
 import com.hostlify.shared.entity.BaseEntity;
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.time.LocalDateTime;
 
+@Getter
+@Setter
 @Entity
 @Table(
     name = "auth_refresh_tokens",
@@ -31,17 +35,4 @@ public class RefreshToken extends BaseEntity {
 
     @Column(name = "device_info", length = 255)
     private String deviceInfo;
-
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    public Long getUserId() { return userId; }
-    public void setUserId(Long userId) { this.userId = userId; }
-    public String getTokenHash() { return tokenHash; }
-    public void setTokenHash(String tokenHash) { this.tokenHash = tokenHash; }
-    public LocalDateTime getExpiresAt() { return expiresAt; }
-    public void setExpiresAt(LocalDateTime expiresAt) { this.expiresAt = expiresAt; }
-    public boolean isIsRevoked() { return isRevoked; }
-    public void setIsRevoked(boolean isRevoked) { this.isRevoked = isRevoked; }
-    public String getDeviceInfo() { return deviceInfo; }
-    public void setDeviceInfo(String deviceInfo) { this.deviceInfo = deviceInfo; }
 }

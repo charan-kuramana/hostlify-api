@@ -1,9 +1,18 @@
 package com.hostlify.module.auth.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class AuthResponse {
     private String accessToken;
     private String refreshToken;
     private String role;
+    private String subRole;
+    private String email;
 
     public AuthResponse() {}
 
@@ -13,10 +22,11 @@ public class AuthResponse {
         this.role = role;
     }
 
-    public String getAccessToken() { return accessToken; }
-    public void setAccessToken(String accessToken) { this.accessToken = accessToken; }
-    public String getRefreshToken() { return refreshToken; }
-    public void setRefreshToken(String refreshToken) { this.refreshToken = refreshToken; }
-    public String getRole() { return role; }
-    public void setRole(String role) { this.role = role; }
+    public AuthResponse(String accessToken, String refreshToken, String role, String subRole, String email) {
+        this.accessToken = accessToken;
+        this.refreshToken = refreshToken;
+        this.role = role;
+        this.subRole = subRole;
+        this.email = email;
+    }
 }

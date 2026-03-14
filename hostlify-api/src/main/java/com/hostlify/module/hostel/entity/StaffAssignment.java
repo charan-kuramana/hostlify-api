@@ -2,10 +2,14 @@ package com.hostlify.module.hostel.entity;
 
 import com.hostlify.shared.entity.BaseEntity;
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 import org.hibernate.annotations.SQLRestriction;
 
 import java.time.LocalDateTime;
 
+@Getter
+@Setter
 @Entity
 @Table(
     name = "hostel_staff_assignments",
@@ -39,19 +43,4 @@ public class StaffAssignment extends BaseEntity {
 
     @Column(name = "assigned_by", nullable = false)
     private Long assignedBy;
-
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    public Long getStaffUserId() { return staffUserId; }
-    public void setStaffUserId(Long staffUserId) { this.staffUserId = staffUserId; }
-    public Long getHostelId() { return hostelId; }
-    public void setHostelId(Long hostelId) { this.hostelId = hostelId; }
-    public Long getOwnerId() { return ownerId; }
-    public void setOwnerId(Long ownerId) { this.ownerId = ownerId; }
-    public boolean isIsActive() { return isActive; }
-    public void setIsActive(boolean isActive) { this.isActive = isActive; }
-    public LocalDateTime getAssignedAt() { return assignedAt; }
-    public void setAssignedAt(LocalDateTime assignedAt) { this.assignedAt = assignedAt; }
-    public Long getAssignedBy() { return assignedBy; }
-    public void setAssignedBy(Long assignedBy) { this.assignedBy = assignedBy; }
 }

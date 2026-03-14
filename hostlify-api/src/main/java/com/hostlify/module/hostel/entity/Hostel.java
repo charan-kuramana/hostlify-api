@@ -2,10 +2,14 @@ package com.hostlify.module.hostel.entity;
 
 import com.hostlify.shared.entity.BaseEntity;
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 import org.hibernate.annotations.SQLRestriction;
 
 import java.math.BigDecimal;
 
+@Getter
+@Setter
 @Entity
 @Table(name = "hostel_hostels")
 @SQLRestriction("is_deleted=0")
@@ -50,31 +54,4 @@ public class Hostel extends BaseEntity {
 
     @Column(name = "default_rent", nullable = false, precision = 12, scale = 2)
     private BigDecimal defaultRent = BigDecimal.ZERO;
-
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    public Long getOwnerId() { return ownerId; }
-    public void setOwnerId(Long ownerId) { this.ownerId = ownerId; }
-    public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
-    public String getHostelType() { return hostelType; }
-    public void setHostelType(String hostelType) { this.hostelType = hostelType; }
-    public String getCity() { return city; }
-    public void setCity(String city) { this.city = city; }
-    public String getPincode() { return pincode; }
-    public void setPincode(String pincode) { this.pincode = pincode; }
-    public String getAddress() { return address; }
-    public void setAddress(String address) { this.address = address; }
-    public BigDecimal getLatitude() { return latitude; }
-    public void setLatitude(BigDecimal latitude) { this.latitude = latitude; }
-    public BigDecimal getLongitude() { return longitude; }
-    public void setLongitude(BigDecimal longitude) { this.longitude = longitude; }
-    public int getTotalFloors() { return totalFloors; }
-    public void setTotalFloors(int totalFloors) { this.totalFloors = totalFloors; }
-    public int getTotalRooms() { return totalRooms; }
-    public void setTotalRooms(int totalRooms) { this.totalRooms = totalRooms; }
-    public int getTotalBeds() { return totalBeds; }
-    public void setTotalBeds(int totalBeds) { this.totalBeds = totalBeds; }
-    public BigDecimal getDefaultRent() { return defaultRent; }
-    public void setDefaultRent(BigDecimal defaultRent) { this.defaultRent = defaultRent; }
 }

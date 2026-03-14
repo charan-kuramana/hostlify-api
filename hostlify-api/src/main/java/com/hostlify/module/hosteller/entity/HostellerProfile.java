@@ -2,10 +2,14 @@ package com.hostlify.module.hosteller.entity;
 
 import com.hostlify.shared.entity.BaseEntity;
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 import org.hibernate.annotations.SQLRestriction;
 
 import java.time.LocalDate;
 
+@Getter
+@Setter
 @Entity
 @Table(name = "hosteller_profiles")
 @SQLRestriction("is_deleted=0")
@@ -71,45 +75,4 @@ public class HostellerProfile extends BaseEntity {
 
     @Column(name = "hostel_id")
     private Long hostelId;
-
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    public Long getAuthUserId() { return authUserId; }
-    public void setAuthUserId(Long authUserId) { this.authUserId = authUserId; }
-    public String getFirstName() { return firstName; }
-    public void setFirstName(String firstName) { this.firstName = firstName; }
-    public String getLastName() { return lastName; }
-    public void setLastName(String lastName) { this.lastName = lastName; }
-    public String getEmail() { return email; }
-    public void setEmail(String email) { this.email = email; }
-    public String getMobile() { return mobile; }
-    public void setMobile(String mobile) { this.mobile = mobile; }
-    public String getAltMobile() { return altMobile; }
-    public void setAltMobile(String altMobile) { this.altMobile = altMobile; }
-    public LocalDate getDateOfBirth() { return dateOfBirth; }
-    public void setDateOfBirth(LocalDate dateOfBirth) { this.dateOfBirth = dateOfBirth; }
-    public String getPhotoUrl() { return photoUrl; }
-    public void setPhotoUrl(String photoUrl) { this.photoUrl = photoUrl; }
-    public String getIdProofType() { return idProofType; }
-    public void setIdProofType(String idProofType) { this.idProofType = idProofType; }
-    public String getIdProofNumber() { return idProofNumber; }
-    public void setIdProofNumber(String idProofNumber) { this.idProofNumber = idProofNumber; }
-    public String getIdProofUrl() { return idProofUrl; }
-    public void setIdProofUrl(String idProofUrl) { this.idProofUrl = idProofUrl; }
-    public String getUserType() { return userType; }
-    public void setUserType(String userType) { this.userType = userType; }
-    public String getCompanyCollege() { return companyCollege; }
-    public void setCompanyCollege(String companyCollege) { this.companyCollege = companyCollege; }
-    public String getPermanentAddress() { return permanentAddress; }
-    public void setPermanentAddress(String permanentAddress) { this.permanentAddress = permanentAddress; }
-    public String getCity() { return city; }
-    public void setCity(String city) { this.city = city; }
-    public String getPincode() { return pincode; }
-    public void setPincode(String pincode) { this.pincode = pincode; }
-    public String getStatus() { return status; }
-    public void setStatus(String status) { this.status = status; }
-    public LocalDate getJoinedDate() { return joinedDate; }
-    public void setJoinedDate(LocalDate joinedDate) { this.joinedDate = joinedDate; }
-    public Long getHostelId() { return hostelId; }
-    public void setHostelId(Long hostelId) { this.hostelId = hostelId; }
 }

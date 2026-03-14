@@ -2,10 +2,14 @@ package com.hostlify.module.menu.entity;
 
 import com.hostlify.shared.entity.BaseEntity;
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 import org.hibernate.annotations.SQLRestriction;
 
 import java.time.LocalDate;
 
+@Getter
+@Setter
 @Entity
 @Table(
     name = "menu_weekly",
@@ -29,13 +33,4 @@ public class WeeklyMenu extends BaseEntity {
 
     @Column(name = "created_by", nullable = false)
     private Long createdBy;
-
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    public Long getHostelId() { return hostelId; }
-    public void setHostelId(Long hostelId) { this.hostelId = hostelId; }
-    public LocalDate getWeekStart() { return weekStart; }
-    public void setWeekStart(LocalDate weekStart) { this.weekStart = weekStart; }
-    public Long getCreatedBy() { return createdBy; }
-    public void setCreatedBy(Long createdBy) { this.createdBy = createdBy; }
 }

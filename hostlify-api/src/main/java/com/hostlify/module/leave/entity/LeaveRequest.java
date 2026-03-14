@@ -2,11 +2,15 @@ package com.hostlify.module.leave.entity;
 
 import com.hostlify.shared.entity.BaseEntity;
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 import org.hibernate.annotations.SQLRestriction;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+@Getter
+@Setter
 @Entity
 @Table(
     name = "leave_requests",
@@ -49,25 +53,4 @@ public class LeaveRequest extends BaseEntity {
 
     @Column(name = "reviewed_at")
     private LocalDateTime reviewedAt;
-
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    public Long getHostellerId() { return hostellerId; }
-    public void setHostellerId(Long hostellerId) { this.hostellerId = hostellerId; }
-    public Long getBookingId() { return bookingId; }
-    public void setBookingId(Long bookingId) { this.bookingId = bookingId; }
-    public String getLeaveType() { return leaveType; }
-    public void setLeaveType(String leaveType) { this.leaveType = leaveType; }
-    public LocalDate getFromDate() { return fromDate; }
-    public void setFromDate(LocalDate fromDate) { this.fromDate = fromDate; }
-    public LocalDate getToDate() { return toDate; }
-    public void setToDate(LocalDate toDate) { this.toDate = toDate; }
-    public String getReason() { return reason; }
-    public void setReason(String reason) { this.reason = reason; }
-    public String getStatus() { return status; }
-    public void setStatus(String status) { this.status = status; }
-    public Long getReviewedBy() { return reviewedBy; }
-    public void setReviewedBy(Long reviewedBy) { this.reviewedBy = reviewedBy; }
-    public LocalDateTime getReviewedAt() { return reviewedAt; }
-    public void setReviewedAt(LocalDateTime reviewedAt) { this.reviewedAt = reviewedAt; }
 }

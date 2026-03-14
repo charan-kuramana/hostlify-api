@@ -2,9 +2,13 @@ package com.hostlify.module.notification.entity;
 
 import com.hostlify.shared.entity.BaseEntity;
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.time.LocalDateTime;
 
+@Getter
+@Setter
 @Entity
 @Table(
     name = "notification_log",
@@ -54,31 +58,4 @@ public class NotificationLog extends BaseEntity {
 
     @Column(name = "sent_at")
     private LocalDateTime sentAt;
-
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    public String getRecipientType() { return recipientType; }
-    public void setRecipientType(String recipientType) { this.recipientType = recipientType; }
-    public Long getRecipientId() { return recipientId; }
-    public void setRecipientId(Long recipientId) { this.recipientId = recipientId; }
-    public String getChannel() { return channel; }
-    public void setChannel(String channel) { this.channel = channel; }
-    public String getTemplateName() { return templateName; }
-    public void setTemplateName(String templateName) { this.templateName = templateName; }
-    public String getSubject() { return subject; }
-    public void setSubject(String subject) { this.subject = subject; }
-    public String getBodyPreview() { return bodyPreview; }
-    public void setBodyPreview(String bodyPreview) { this.bodyPreview = bodyPreview; }
-    public String getToEmail() { return toEmail; }
-    public void setToEmail(String toEmail) { this.toEmail = toEmail; }
-    public String getStatus() { return status; }
-    public void setStatus(String status) { this.status = status; }
-    public String getProviderMessageId() { return providerMessageId; }
-    public void setProviderMessageId(String providerMessageId) { this.providerMessageId = providerMessageId; }
-    public String getErrorMessage() { return errorMessage; }
-    public void setErrorMessage(String errorMessage) { this.errorMessage = errorMessage; }
-    public int getRetryCount() { return retryCount; }
-    public void setRetryCount(int retryCount) { this.retryCount = retryCount; }
-    public LocalDateTime getSentAt() { return sentAt; }
-    public void setSentAt(LocalDateTime sentAt) { this.sentAt = sentAt; }
 }

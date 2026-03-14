@@ -45,13 +45,40 @@ public class JwtFilter extends OncePerRequestFilter {
         try {
             Claims claims = jwtService.validateToken(jwt);
             if (SecurityContextHolder.getContext().getAuthentication() == null) {
-                String userUuid = claims.getSubject();
                 String role = claims.get("role", String.class);
 
-                JwtContext context = new JwtContext(userUuid, role);
+                UserPrincipal principal = new UserPrincipal();
+                principal.setUuid(claims.getSubject());
+                principal.setRole(role);
+                principal.setSubRole(claims.get("sub_role", String.class));
+                principal.setName(claims.get("name", String.class));
+                principal.setStatus(claims.get("status", String.class));
+
+                Object userIdObj = claims.get("userId");
+                if (userIdObj instanceof Number) {
+                    principal.setUserId(((Number) userIdObj).longValue());
+                }
+
+                if ("HOSTELLER".equals(role)) {
+                    Object hostelIdObj = claims.get("hostelId");
+                    if (hostelIdObj instanceof Number) principal.setHostelId(((Number) hostelIdObj).longValue());
+                    Object bookingIdObj = claims.get("bookingId");
+                    if (bookingIdObj instanceof Number) principal.setBookingId(((Number) bookingIdObj).longValue());
+                } else if ("HOSTEL_STAFF".equals(role)) {
+                    Object ownerIdObj = claims.get("owner_id");
+                    if (ownerIdObj instanceof Number) principal.setOwnerId(((Number) ownerIdObj).longValue());
+                    Object hostelIdsObj = claims.get("hostel_ids");
+                    if (hostelIdsObj instanceof java.util.List<?> rawList) {
+                        java.util.List<Long> ids = new java.util.ArrayList<>();
+                        for (Object item : rawList) {
+                            if (item instanceof Number) ids.add(((Number) item).longValue());
+                        }
+                        principal.setHostelIds(ids);
+                    }
+                }
 
                 UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                        context,
+                        principal,
                         null,
                         Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + role))
                 );
@@ -62,7 +89,7 @@ public class JwtFilter extends OncePerRequestFilter {
         } catch (Exception e) {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.setContentType("application/json");
-            response.getWriter().write("{\"success\":false,\"message\":\"Invalid or expired token\"}");
+            response.getWriter().write("{\"success\":false,\"error\":\"INVALID_TOKEN\",\"message\":\"Invalid or expired token\"}");
             return;
         }
 

@@ -1,8 +1,10 @@
 package com.hostlify.module.announcement.service;
 
 import com.hostlify.module.announcement.entity.Announcement;
+import com.hostlify.module.announcement.event.AnnouncementPublishedEvent;
 import com.hostlify.module.announcement.repository.AnnouncementRepository;
 import com.hostlify.shared.exception.AppException;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,9 +16,12 @@ import java.util.List;
 public class AnnouncementService {
 
     private final AnnouncementRepository announcementRepo;
+    private final ApplicationEventPublisher eventPublisher;
 
-    public AnnouncementService(AnnouncementRepository announcementRepo) {
+    public AnnouncementService(AnnouncementRepository announcementRepo,
+                                ApplicationEventPublisher eventPublisher) {
         this.announcementRepo = announcementRepo;
+        this.eventPublisher = eventPublisher;
     }
 
     public List<Announcement> getVisibleByHostel(Long hostelId) {
@@ -37,7 +42,9 @@ public class AnnouncementService {
 
     @Transactional
     public Announcement create(Announcement announcement) {
-        return announcementRepo.save(announcement);
+        Announcement saved = announcementRepo.save(announcement);
+        eventPublisher.publishEvent(new AnnouncementPublishedEvent(this, saved));
+        return saved;
     }
 
     @Transactional

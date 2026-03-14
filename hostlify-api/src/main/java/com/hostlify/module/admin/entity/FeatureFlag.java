@@ -2,8 +2,12 @@ package com.hostlify.module.admin.entity;
 
 import com.hostlify.shared.entity.BaseEntity;
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 import org.hibernate.annotations.SQLRestriction;
 
+@Getter
+@Setter
 @Entity
 @Table(
     name = "admin_feature_flags",
@@ -33,17 +37,4 @@ public class FeatureFlag extends BaseEntity {
 
     @Column(length = 300)
     private String reason;
-
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    public Long getOwnerId() { return ownerId; }
-    public void setOwnerId(Long ownerId) { this.ownerId = ownerId; }
-    public String getFlagName() { return flagName; }
-    public void setFlagName(String flagName) { this.flagName = flagName; }
-    public boolean isIsEnabled() { return isEnabled; }
-    public void setIsEnabled(boolean isEnabled) { this.isEnabled = isEnabled; }
-    public Long getSetBy() { return setBy; }
-    public void setSetBy(Long setBy) { this.setBy = setBy; }
-    public String getReason() { return reason; }
-    public void setReason(String reason) { this.reason = reason; }
 }
