@@ -9,7 +9,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class HostelService {
@@ -71,6 +73,35 @@ public class HostelService {
         existing.setLatitude(req.getLatitude());
         existing.setLongitude(req.getLongitude());
         existing.setDefaultRent(req.getDefaultRent());
+        existing.setOnlinePaymentEnabled(req.isOnlinePaymentEnabled());
+        return hostelRepo.save(existing);
+    }
+
+    @Transactional
+    public Hostel partialUpdateHostel(Long id, Map<String, Object> body) {
+        Hostel existing = getHostel(id);
+        if (body.containsKey("name")) existing.setName((String) body.get("name"));
+        if (body.containsKey("hostelName")) existing.setName((String) body.get("hostelName"));
+        if (body.containsKey("type")) existing.setHostelType((String) body.get("type"));
+        if (body.containsKey("hostelType")) existing.setHostelType((String) body.get("hostelType"));
+        if (body.containsKey("city") && body.get("city") != null) existing.setCity((String) body.get("city"));
+        if (body.containsKey("pincode") && body.get("pincode") != null) existing.setPincode((String) body.get("pincode"));
+        if (body.containsKey("address")) existing.setAddress((String) body.get("address"));
+        if (body.containsKey("locality")) existing.setLandmark((String) body.get("locality"));
+        if (body.containsKey("contact")) existing.setContactPhone((String) body.get("contact"));
+        if (body.containsKey("contactPhone")) existing.setContactPhone((String) body.get("contactPhone"));
+        if (body.containsKey("about")) existing.setAbout((String) body.get("about"));
+        if (body.containsKey("defaultRent") && body.get("defaultRent") != null) {
+            existing.setDefaultRent(new BigDecimal(body.get("defaultRent").toString()));
+        }
+        if (body.containsKey("onlinePaymentEnabled")) {
+            existing.setOnlinePaymentEnabled(Boolean.TRUE.equals(body.get("onlinePaymentEnabled")));
+        }
+        // Ensure non-null required fields have fallback values to prevent constraint violations
+        if (existing.getName() == null || existing.getName().isBlank()) existing.setName("Unnamed Hostel");
+        if (existing.getHostelType() == null || existing.getHostelType().isBlank()) existing.setHostelType("MIXED");
+        if (existing.getCity() == null || existing.getCity().isBlank()) existing.setCity("Unknown");
+        if (existing.getPincode() == null || existing.getPincode().isBlank()) existing.setPincode("000000");
         return hostelRepo.save(existing);
     }
     @Transactional

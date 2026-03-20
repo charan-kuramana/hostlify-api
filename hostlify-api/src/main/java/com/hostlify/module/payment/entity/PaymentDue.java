@@ -1,5 +1,6 @@
 package com.hostlify.module.payment.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.hostlify.shared.entity.BaseEntity;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -46,9 +47,17 @@ public class PaymentDue extends BaseEntity {
     @Column(name = "due_date", nullable = false)
     private LocalDate dueDate;
 
+    @JsonProperty("amount")
     @Column(name = "rent_amount", nullable = false, precision = 12, scale = 2)
     private BigDecimal rentAmount = BigDecimal.ZERO;
 
     @Column(nullable = false, length = 20)
     private String status = "UNPAID";
+
+    // Transient enrichment fields (populated by service, not persisted)
+    @Transient
+    private String hostellerName;
+
+    @Transient
+    private String roomNumber;
 }

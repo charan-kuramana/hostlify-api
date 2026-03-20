@@ -11,4 +11,5 @@ import java.util.Optional;
 public interface ExpenseSalaryRecordRepository extends JpaRepository<ExpenseSalaryRecord, Long> {
     List<ExpenseSalaryRecord> findByHostelIdAndPeriodYearAndPeriodMonth(Long hostelId, int year, int month);
     Optional<ExpenseSalaryRecord> findByEmployeeIdAndPeriodYearAndPeriodMonth(Long employeeId, int year, int month);
+    Optional<ExpenseSalaryRecord> findFirstByEmployeeIdAndStatusOrderByPeriodYearDescPeriodMonthDesc(Long employeeId, String status);
 }

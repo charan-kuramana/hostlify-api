@@ -12,9 +12,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class ExpenseService {
@@ -35,6 +38,15 @@ public class ExpenseService {
 
     @Transactional
     public ExpenseRecord addExpense(ExpenseRecord expense) {
+        // Auto-populate period from expenseDate if not set
+        if (expense.getExpenseDate() != null) {
+            if (expense.getPeriodMonth() == 0) {
+                expense.setPeriodMonth(expense.getExpenseDate().getMonthValue());
+            }
+            if (expense.getPeriodYear() == 0) {
+                expense.setPeriodYear(expense.getExpenseDate().getYear());
+            }
+        }
         return expenseRepo.save(expense);
     }
 
@@ -57,9 +69,19 @@ public class ExpenseService {
             byCategory.merge(r.getCategory(), r.getAmount(), BigDecimal::add);
         }
 
+        List<Map<String, Object>> byCategoryList = byCategory.entrySet().stream()
+                .sorted(Map.Entry.<String, BigDecimal>comparingByValue().reversed())
+                .map(e -> {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("category", e.getKey());
+                    m.put("amount", e.getValue());
+                    return m;
+                })
+                .collect(Collectors.toList());
+
         Map<String, Object> summary = new HashMap<>();
         summary.put("total", total);
-        summary.put("byCategory", byCategory);
+        summary.put("byCategory", byCategoryList);
         summary.put("count", records.size());
         summary.put("month", month);
         summary.put("year", year);
@@ -74,7 +96,18 @@ public class ExpenseService {
     }
 
     public List<ExpenseEmployee> getEmployees(Long hostelId) {
-        return employeeRepo.findByHostelId(hostelId);
+        List<ExpenseEmployee> list = employeeRepo.findByHostelId(hostelId);
+        list.forEach(emp -> {
+            salaryRepo.findFirstByEmployeeIdAndStatusOrderByPeriodYearDescPeriodMonthDesc(emp.getId(), "PAID")
+                .ifPresent(sr -> {
+                    if (sr.getPaidAt() != null) {
+                        emp.setLastPaidDate(sr.getPaidAt().toLocalDate());
+                    } else {
+                        emp.setLastPaidDate(java.time.LocalDate.of(sr.getPeriodYear(), sr.getPeriodMonth(), 1));
+                    }
+                });
+        });
+        return list;
     }
 
     public ExpenseEmployee getEmployee(Long id) {

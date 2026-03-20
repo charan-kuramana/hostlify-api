@@ -45,4 +45,7 @@ public class ParkingRecord extends BaseEntity {
 
     @Column(name = "registered_at", nullable = false)
     private LocalDateTime registeredAt;
+
+    @Transient private String hostellerName;
+    @Transient private String roomNumber;
 }

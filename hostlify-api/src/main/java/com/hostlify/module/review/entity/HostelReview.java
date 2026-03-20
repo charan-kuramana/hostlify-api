@@ -40,4 +40,7 @@ public class HostelReview extends BaseEntity {
 
     @Column(name = "is_visible", nullable = false)
     private boolean isVisible = true;
+
+    @Transient private String hostellerName;
+    @Transient private String memberName;
 }

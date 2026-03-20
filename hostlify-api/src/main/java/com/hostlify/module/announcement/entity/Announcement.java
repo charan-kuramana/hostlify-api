@@ -1,5 +1,6 @@
 package com.hostlify.module.announcement.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.hostlify.shared.entity.BaseEntity;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -31,8 +32,12 @@ public class Announcement extends BaseEntity {
     @Column(nullable = false, length = 200)
     private String title;
 
+    @JsonProperty("content")
     @Column(columnDefinition = "TEXT")
     private String body;
+
+    @Column(length = 50)
+    private String category;
 
     @Column(nullable = false, length = 20)
     private String priority = "NORMAL";

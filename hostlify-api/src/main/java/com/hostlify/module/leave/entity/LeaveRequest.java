@@ -30,7 +30,7 @@ public class LeaveRequest extends BaseEntity {
     @Column(name = "hosteller_id", nullable = false)
     private Long hostellerId;
 
-    @Column(name = "booking_id", nullable = false)
+    @Column(name = "booking_id")
     private Long bookingId;
 
     @Column(name = "leave_type", nullable = false, length = 20)
@@ -53,4 +53,9 @@ public class LeaveRequest extends BaseEntity {
 
     @Column(name = "reviewed_at")
     private LocalDateTime reviewedAt;
+
+    @Transient private String hostellerName;
+    @Transient private String roomNumber;
+
+    public java.time.LocalDateTime getAppliedAt() { return getCreatedAt(); }
 }

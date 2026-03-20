@@ -9,5 +9,6 @@ import java.util.Optional;
 @Repository
 public interface ReferralCodeRepository extends JpaRepository<ReferralCode, Long> {
     Optional<ReferralCode> findByCode(String code);
+    boolean existsByCode(String code);
     Optional<ReferralCode> findByHostellerId(Long hostellerId);
 }

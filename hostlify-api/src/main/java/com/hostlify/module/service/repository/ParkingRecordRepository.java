@@ -10,6 +10,7 @@ import java.util.Optional;
 @Repository
 public interface ParkingRecordRepository extends JpaRepository<ParkingRecord, Long> {
     List<ParkingRecord> findByHostelIdAndStatus(Long hostelId, String status);
+    List<ParkingRecord> findByHostellerIdOrderByRegisteredAtDesc(Long hostellerId);
     Optional<ParkingRecord> findByHostellerIdAndStatus(Long hostellerId, String status);
     Optional<ParkingRecord> findByVehicleNumber(String vehicleNumber);
 }

@@ -42,6 +42,9 @@ public class AnnouncementService {
 
     @Transactional
     public Announcement create(Announcement announcement) {
+        if (announcement.getValidFrom() == null) {
+            announcement.setValidFrom(LocalDate.now());
+        }
         Announcement saved = announcementRepo.save(announcement);
         eventPublisher.publishEvent(new AnnouncementPublishedEvent(this, saved));
         return saved;

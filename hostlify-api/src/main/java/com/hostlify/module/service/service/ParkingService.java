@@ -1,5 +1,8 @@
 package com.hostlify.module.service.service;
 
+import com.hostlify.module.booking.repository.BookingCheckinRepository;
+import com.hostlify.module.hosteller.repository.HostellerProfileRepository;
+import com.hostlify.module.hostel.repository.RoomRepository;
 import com.hostlify.module.service.entity.ParkingRecord;
 import com.hostlify.module.service.repository.ParkingRecordRepository;
 import com.hostlify.shared.exception.AppException;
@@ -14,18 +17,34 @@ import java.util.List;
 public class ParkingService {
 
     private final ParkingRecordRepository parkingRepo;
+    private final HostellerProfileRepository profileRepo;
+    private final BookingCheckinRepository bookingRepo;
+    private final RoomRepository roomRepo;
 
-    public ParkingService(ParkingRecordRepository parkingRepo) {
+    public ParkingService(ParkingRecordRepository parkingRepo,
+                          HostellerProfileRepository profileRepo,
+                          BookingCheckinRepository bookingRepo,
+                          RoomRepository roomRepo) {
         this.parkingRepo = parkingRepo;
+        this.profileRepo = profileRepo;
+        this.bookingRepo = bookingRepo;
+        this.roomRepo = roomRepo;
     }
 
     public List<ParkingRecord> getActiveParking(Long hostelId) {
-        return parkingRepo.findByHostelIdAndStatus(hostelId, "ACTIVE");
+        List<ParkingRecord> list = parkingRepo.findByHostelIdAndStatus(hostelId, "ACTIVE");
+        list.forEach(item -> {
+            profileRepo.findById(item.getHostellerId()).ifPresent(p ->
+                item.setHostellerName(p.getFirstName() + " " + (p.getLastName() != null ? p.getLastName() : "").trim()));
+            bookingRepo.findFirstByHostellerIdAndStatus(item.getHostellerId(), "ACTIVE")
+                .ifPresent(b -> roomRepo.findById(b.getRoomId())
+                    .ifPresent(r -> item.setRoomNumber(r.getRoomName())));
+        });
+        return list;
     }
 
-    public ParkingRecord getMyParking(Long hostellerId) {
-        return parkingRepo.findByHostellerIdAndStatus(hostellerId, "ACTIVE")
-                .orElseThrow(() -> new AppException("No active parking record found", HttpStatus.NOT_FOUND));
+    public List<ParkingRecord> getMyParking(Long hostellerId) {
+        return parkingRepo.findByHostellerIdOrderByRegisteredAtDesc(hostellerId);
     }
 
     @Transactional
@@ -38,9 +57,17 @@ public class ParkingService {
             }
         });
 
+        // Resolve hostelId from active booking if not provided in JWT
+        Long resolvedHostelId = hostelId;
+        if (resolvedHostelId == null) {
+            resolvedHostelId = bookingRepo.findFirstByHostellerIdAndStatus(hostellerId, "ACTIVE")
+                    .map(b -> b.getHostelId())
+                    .orElse(null);
+        }
+
         ParkingRecord record = new ParkingRecord();
         record.setHostellerId(hostellerId);
-        record.setHostelId(hostelId);
+        record.setHostelId(resolvedHostelId);
         record.setVehicleNumber(vehicleNumber.toUpperCase());
         record.setVehicleType(vehicleType);
         record.setSlotNumber(slotNumber);

@@ -64,6 +64,8 @@ public class JwtFilter extends OncePerRequestFilter {
                     if (hostelIdObj instanceof Number) principal.setHostelId(((Number) hostelIdObj).longValue());
                     Object bookingIdObj = claims.get("bookingId");
                     if (bookingIdObj instanceof Number) principal.setBookingId(((Number) bookingIdObj).longValue());
+                    Object hostellerProfileIdObj = claims.get("hostellerProfileId");
+                    if (hostellerProfileIdObj instanceof Number) principal.setHostellerProfileId(((Number) hostellerProfileIdObj).longValue());
                 } else if ("HOSTEL_STAFF".equals(role)) {
                     Object ownerIdObj = claims.get("owner_id");
                     if (ownerIdObj instanceof Number) principal.setOwnerId(((Number) ownerIdObj).longValue());

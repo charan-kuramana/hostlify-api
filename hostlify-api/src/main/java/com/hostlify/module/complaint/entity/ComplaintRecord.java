@@ -61,4 +61,7 @@ public class ComplaintRecord extends BaseEntity {
 
     @Column(name = "resolved_at")
     private LocalDateTime resolvedAt;
+
+    @Transient private String hostellerName;
+    @Transient private String roomNumber;
 }

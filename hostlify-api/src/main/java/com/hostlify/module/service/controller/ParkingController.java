@@ -8,6 +8,7 @@ import com.hostlify.shared.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
@@ -27,19 +28,22 @@ public class ParkingController {
     }
 
     @GetMapping("/hostel/{hostelId}")
+    @PreAuthorize("hasRole('HOSTEL_STAFF')")
     @Operation(summary = "Staff: list all active parking registrations for a hostel")
     public ApiResponse<List<ParkingRecord>> getActiveParking(@PathVariable Long hostelId) {
         return ApiResponse.ok(parkingService.getActiveParking(hostelId));
     }
 
     @GetMapping("/me")
-    @Operation(summary = "Hosteller: get my active parking record")
-    public ApiResponse<ParkingRecord> getMyParking() {
+    @PreAuthorize("hasRole('HOSTELLER')")
+    @Operation(summary = "Hosteller: get my parking records")
+    public ApiResponse<List<ParkingRecord>> getMyParking() {
         UserPrincipal p = getPrincipal();
         return ApiResponse.ok(parkingService.getMyParking(p.getHostellerProfileId()));
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('HOSTELLER')")
     @Operation(summary = "Hosteller: register a vehicle for parking")
     public ApiResponse<ParkingRecord> register(@RequestBody Map<String, Object> body) {
         UserPrincipal p = getPrincipal();
@@ -57,12 +61,14 @@ public class ParkingController {
     }
 
     @DeleteMapping("/{recordId}")
+    @PreAuthorize("hasAnyRole('HOSTEL_STAFF','HOSTELLER')")
     @Operation(summary = "Staff or Hosteller: deregister a parking record")
     public ApiResponse<ParkingRecord> deregister(@PathVariable Long recordId) {
         return ApiResponse.ok(parkingService.deregisterParking(recordId), "Parking record removed");
     }
 
     @PatchMapping("/{recordId}/slot")
+    @PreAuthorize("hasRole('HOSTEL_STAFF')")
     @Operation(summary = "Staff: update the slot number for a parking record")
     public ApiResponse<ParkingRecord> updateSlot(@PathVariable Long recordId,
                                                    @RequestParam String slotNumber) {

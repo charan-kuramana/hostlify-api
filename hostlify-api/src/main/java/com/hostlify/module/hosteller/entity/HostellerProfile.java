@@ -75,4 +75,21 @@ public class HostellerProfile extends BaseEntity {
 
     @Column(name = "hostel_id")
     private Long hostelId;
+
+    public String getName() {
+        String full = (firstName != null ? firstName : "") + (lastName != null ? " " + lastName : "");
+        return full.trim();
+    }
+
+    /** Alias for mobile — used by frontend */
+    public String getPhone() { return mobile; }
+
+    /** Alias for joinedDate — used by frontend */
+    public java.time.LocalDate getJoinDate() { return joinedDate; }
+
+    @Transient private String roomNumber;
+    @Transient private String type;
+    @Transient private java.math.BigDecimal advance;
+    @Transient private java.math.BigDecimal monthlyRent;
+    @Transient private Long bookingId;
 }

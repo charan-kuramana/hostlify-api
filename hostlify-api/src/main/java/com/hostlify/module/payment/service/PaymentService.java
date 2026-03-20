@@ -3,6 +3,7 @@ package com.hostlify.module.payment.service;
 import com.hostlify.module.auth.repository.AuthUserRepository;
 import com.hostlify.module.booking.entity.BookingCheckin;
 import com.hostlify.module.booking.repository.BookingCheckinRepository;
+import com.hostlify.module.hostel.repository.RoomRepository;
 import com.hostlify.module.hosteller.entity.HostellerProfile;
 import com.hostlify.module.hosteller.repository.HostellerProfileRepository;
 import com.hostlify.module.payment.entity.PaymentDue;
@@ -34,6 +35,7 @@ public class PaymentService {
     private final BookingCheckinRepository bookingRepo;
     private final HostellerProfileRepository profileRepo;
     private final AuthUserRepository authUserRepo;
+    private final RoomRepository roomRepo;
     private final ApplicationEventPublisher eventPublisher;
 
     @Value("${app.razorpay.key-id:test_key}")
@@ -48,6 +50,7 @@ public class PaymentService {
                           BookingCheckinRepository bookingRepo,
                           HostellerProfileRepository profileRepo,
                           AuthUserRepository authUserRepo,
+                          RoomRepository roomRepo,
                           ApplicationEventPublisher eventPublisher) {
         this.dueRepo = dueRepo;
         this.orderRepo = orderRepo;
@@ -55,6 +58,7 @@ public class PaymentService {
         this.bookingRepo = bookingRepo;
         this.profileRepo = profileRepo;
         this.authUserRepo = authUserRepo;
+        this.roomRepo = roomRepo;
         this.eventPublisher = eventPublisher;
     }
 
@@ -74,7 +78,14 @@ public class PaymentService {
     }
 
     public List<PaymentDue> getPendingDuesByHostel(Long hostelId) {
-        return dueRepo.findByHostelIdAndStatus(hostelId, "UNPAID");
+        List<PaymentDue> dues = dueRepo.findByHostelIdAndStatus(hostelId, "UNPAID");
+        dues.forEach(due -> {
+            profileRepo.findById(due.getHostellerId()).ifPresent(p ->
+                    due.setHostellerName(p.getFirstName() + " " + (p.getLastName() != null ? p.getLastName() : "").trim()));
+            bookingRepo.findById(due.getBookingId()).ifPresent(b ->
+                    roomRepo.findById(b.getRoomId()).ifPresent(r -> due.setRoomNumber(r.getRoomName())));
+        });
+        return dues;
     }
 
     public PaymentDue getDue(Long id) {

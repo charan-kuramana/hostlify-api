@@ -8,6 +8,7 @@ import com.hostlify.shared.dto.ApiResponse;
 import com.hostlify.shared.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
@@ -31,6 +32,7 @@ public class PaymentController {
     // ─── Hosteller: own dues ─────────────────────────────────────
 
     @GetMapping("/dues/current")
+    @PreAuthorize("hasRole('HOSTELLER')")
     @Operation(summary = "Hosteller: get current month's due")
     public ApiResponse<PaymentDue> getCurrentDue() {
         UserPrincipal principal = getPrincipal();
@@ -38,6 +40,7 @@ public class PaymentController {
     }
 
     @GetMapping("/dues/history")
+    @PreAuthorize("hasRole('HOSTELLER')")
     @Operation(summary = "Hosteller: get all dues history")
     public ApiResponse<List<PaymentDue>> getDueHistory() {
         UserPrincipal principal = getPrincipal();
@@ -49,6 +52,7 @@ public class PaymentController {
     // ─── Razorpay ────────────────────────────────────────────────
 
     @PostMapping("/razorpay/initiate")
+    @PreAuthorize("hasRole('HOSTELLER')")
     @Operation(summary = "Hosteller: initiate Razorpay order for a due")
     public ApiResponse<PaymentRazorpayOrder> initiateRazorpay(@RequestBody Map<String, Object> body) {
         UserPrincipal principal = getPrincipal();
@@ -60,6 +64,7 @@ public class PaymentController {
     // ─── Staff: cash payment ─────────────────────────────────────
 
     @PostMapping("/cash")
+    @PreAuthorize("hasRole('HOSTEL_STAFF')")
     @Operation(summary = "Staff: record a cash/manual payment")
     public ApiResponse<PaymentRecord> recordCash(@RequestBody Map<String, Object> body) {
         UserPrincipal principal = getPrincipal();
@@ -78,6 +83,7 @@ public class PaymentController {
     // ─── Staff: generate dues ────────────────────────────────────
 
     @PostMapping("/dues/generate")
+    @PreAuthorize("hasRole('HOSTEL_STAFF')")
     @Operation(summary = "Staff: generate monthly dues for all active bookings in a hostel")
     public ApiResponse<Map<String, Integer>> generateDues(@RequestParam Long hostelId,
                                                            @RequestParam int month,
@@ -88,6 +94,7 @@ public class PaymentController {
     }
 
     @GetMapping("/dues/hostel/{hostelId}/pending")
+    @PreAuthorize("hasRole('HOSTEL_STAFF')")
     @Operation(summary = "Staff: list pending dues for a hostel")
     public ApiResponse<List<PaymentDue>> getPendingByHostel(@PathVariable Long hostelId) {
         return ApiResponse.ok(paymentService.getPendingDuesByHostel(hostelId));
@@ -96,6 +103,7 @@ public class PaymentController {
     // ─── Due adjustment & receipt ────────────────────────────────
 
     @PutMapping("/dues/{id}/adjust")
+    @PreAuthorize("hasRole('HOSTEL_STAFF')")
     @Operation(summary = "Staff: apply a discount or late fee to a payment due")
     public ApiResponse<?> adjustDue(@PathVariable Long id, @RequestBody Map<String, Object> body) {
         BigDecimal amount = new BigDecimal(body.get("adjustmentAmount").toString());
@@ -105,6 +113,7 @@ public class PaymentController {
     }
 
     @GetMapping("/receipt/{dueId}")
+    @PreAuthorize("hasAnyRole('HOSTELLER','HOSTEL_STAFF')")
     @Operation(summary = "Hosteller / Staff: get payment receipt for a due")
     public ApiResponse<?> getReceipt(@PathVariable Long dueId) {
         return ApiResponse.ok(paymentService.generateReceipt(dueId));

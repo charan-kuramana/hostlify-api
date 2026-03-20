@@ -5,9 +5,11 @@ import com.hostlify.module.hostel.service.HostelService;
 import com.hostlify.shared.dto.ApiResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1")
@@ -69,14 +71,26 @@ public class HostelController {
     }
 
     @PutMapping("/hostels/{id}")
-    public ApiResponse<Hostel> updateHostel(@PathVariable Long id, @RequestBody Hostel hostel) {
-        return ApiResponse.ok(hostelService.updateHostel(id, hostel));
+    @PreAuthorize("hasAnyRole('HOSTEL_STAFF','SUPER_ADMIN')")
+    public ApiResponse<Hostel> updateHostel(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        return ApiResponse.ok(hostelService.partialUpdateHostel(id, body));
     }
 
     @DeleteMapping("/hostels/{id}")
     public ApiResponse<Void> deleteHostel(@PathVariable Long id) {
         hostelService.deleteHostel(id);
         return ApiResponse.ok(null, "Hostel deleted");
+    }
+
+    @PatchMapping("/hostels/{id}/settings")
+    @PreAuthorize("hasRole('HOSTEL_STAFF')")
+    public ApiResponse<Hostel> updateHostelSettings(@PathVariable Long id,
+                                                     @RequestBody Map<String, Object> body) {
+        Hostel hostel = hostelService.getHostel(id);
+        if (body.containsKey("onlinePaymentEnabled")) {
+            hostel.setOnlinePaymentEnabled(Boolean.TRUE.equals(body.get("onlinePaymentEnabled")));
+        }
+        return ApiResponse.ok(hostelService.updateHostel(id, hostel), "Settings updated");
     }
 
     // Floor endpoints
@@ -104,8 +118,33 @@ public class HostelController {
     }
 
     @PostMapping("/floors/{floorId}/rooms")
-    public ApiResponse<Room> createRoom(@PathVariable Long floorId, @RequestBody Room room) {
+    public ApiResponse<Room> createRoom(@PathVariable Long floorId, @RequestBody Map<String, Object> body) {
+        // Get floor to find hostelId
+        Floor floor = hostelService.getFloor(floorId);
+        if (floor.getHostelId() == null) {
+            throw new com.hostlify.shared.exception.AppException("Floor has no associated hostel", org.springframework.http.HttpStatus.BAD_REQUEST);
+        }
+        Room room = new Room();
         room.setFloorId(floorId);
+        room.setHostelId(floor.getHostelId());
+        // Support roomName, roomNumber, or name as field names
+        String name = body.containsKey("roomName") ? (String) body.get("roomName")
+                    : body.containsKey("roomNumber") ? (String) body.get("roomNumber")
+                    : body.containsKey("name") ? (String) body.get("name") : null;
+        if (name == null || name.isBlank()) {
+            throw new com.hostlify.shared.exception.AppException("Room name is required", org.springframework.http.HttpStatus.BAD_REQUEST);
+        }
+        room.setRoomName(name.trim());
+        // Support roomType or type as field names
+        String type = body.containsKey("roomType") ? (String) body.get("roomType")
+                    : body.containsKey("type") ? (String) body.get("type") : "SINGLE";
+        room.setRoomType(type != null ? type : "SINGLE");
+        // Capacity / totalBeds
+        if (body.containsKey("capacity") && body.get("capacity") != null) {
+            room.setCapacity(((Number) body.get("capacity")).intValue());
+        } else if (body.containsKey("totalBeds") && body.get("totalBeds") != null) {
+            room.setCapacity(((Number) body.get("totalBeds")).intValue());
+        }
         return ApiResponse.ok(hostelService.createRoom(room));
     }
 
@@ -122,8 +161,22 @@ public class HostelController {
     }
 
     @PostMapping("/rooms/{roomId}/beds")
-    public ApiResponse<Bed> createBed(@PathVariable Long roomId, @RequestBody Bed bed) {
+    public ApiResponse<Bed> createBed(@PathVariable Long roomId, @RequestBody Map<String, Object> body) {
+        Room room = hostelService.getRoom(roomId);
+        Bed bed = new Bed();
         bed.setRoomId(roomId);
+        bed.setHostelId(room.getHostelId());
+        // Support bedLabel, bedName, or label as field names
+        String bedName = body.containsKey("bedName") ? (String) body.get("bedName")
+                       : body.containsKey("bedLabel") ? (String) body.get("bedLabel")
+                       : body.containsKey("label") ? (String) body.get("label") : null;
+        // Auto-generate a bed name if none provided
+        if (bedName == null || bedName.isBlank()) {
+            long existingCount = hostelService.getBedsByRoom(roomId).size();
+            bedName = room.getRoomName() + "-" + (char)('A' + existingCount);
+        }
+        bed.setBedName(bedName);
+        bed.setStatus("AVAILABLE");
         return ApiResponse.ok(hostelService.createBed(bed));
     }
 

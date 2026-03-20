@@ -43,6 +43,18 @@ public class Hostel extends BaseEntity {
     @Column(precision = 10, scale = 7)
     private BigDecimal longitude;
 
+    @Column(name = "google_place_id", length = 100)
+    private String googlePlaceId;
+
+    @Column(length = 255)
+    private String landmark;
+
+    @Column(columnDefinition = "TEXT")
+    private String about;
+
+    @Column(name = "contact_phone", length = 20)
+    private String contactPhone;
+
     @Column(name = "total_floors", nullable = false)
     private int totalFloors = 0;
 
@@ -54,4 +66,7 @@ public class Hostel extends BaseEntity {
 
     @Column(name = "default_rent", nullable = false, precision = 12, scale = 2)
     private BigDecimal defaultRent = BigDecimal.ZERO;
+
+    @Column(name = "online_payment_enabled", nullable = false)
+    private boolean onlinePaymentEnabled = true;
 }

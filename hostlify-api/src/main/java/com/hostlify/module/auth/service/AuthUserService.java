@@ -201,17 +201,21 @@ public class AuthUserService {
 
     private AuthResponse buildAuthResponse(AuthUser user) {
         Map<String, Object> claims = new HashMap<>();
+        AuthResponse response = new AuthResponse(null, null, user.getRole(), user.getSubRole(), user.getEmail());
 
         if ("HOSTELLER".equals(user.getRole())) {
             HostellerProfile profile = hostellerProfileRepository.findByAuthUserId(user.getId()).orElse(null);
             if (profile != null) {
                 claims.put("hostelId", profile.getHostelId());
+                claims.put("hostellerProfileId", profile.getId());
                 Long bookingId = bookingCheckinRepository
                         .findFirstByHostellerIdAndStatus(profile.getId(), "ACTIVE")
                         .map(b -> b.getId())
                         .orElse(null);
                 claims.put("bookingId", bookingId);
-                claims.put("hostellerProfileId", profile.getId());
+                response.setHostelId(profile.getHostelId());
+                response.setHostellerProfileId(profile.getId());
+                response.setBookingId(bookingId);
             }
         } else if ("HOSTEL_STAFF".equals(user.getRole())) {
             var assignments = staffAssignmentRepository.findByStaffUserIdAndIsActiveTrue(user.getId());
@@ -222,19 +226,22 @@ public class AuthUserService {
             claims.put("hostel_ids", hostelIds);
             claims.put("owner_id", ownerId);
             claims.put("sub_role", user.getSubRole());
+            response.setHostelIds(hostelIds);
+            response.setOwnerId(ownerId);
         }
 
         String accessToken = jwtService.generateAccessToken(user, claims);
         String refreshToken = jwtService.generateRefreshToken(user);
+        response.setAccessToken(accessToken);
+        response.setRefreshToken(refreshToken);
 
         RefreshToken rtEntity = new RefreshToken();
         rtEntity.setUserId(user.getId());
-        // Store a hash of the refresh token (not the raw token) for security
-        rtEntity.setTokenHash(java.util.UUID.randomUUID().toString()); // unique placeholder; real app would hash the token
+        rtEntity.setTokenHash(java.util.UUID.randomUUID().toString());
         rtEntity.setExpiresAt(LocalDateTime.now().plusDays(30));
         rtEntity.setRevoked(false);
         refreshTokenRepository.save(rtEntity);
 
-        return new AuthResponse(accessToken, refreshToken, user.getRole(), user.getSubRole(), user.getEmail());
+        return response;
     }
 }

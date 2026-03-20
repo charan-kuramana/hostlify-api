@@ -8,6 +8,7 @@ import com.hostlify.shared.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
@@ -26,12 +27,14 @@ public class ReviewController {
     }
 
     @GetMapping("/hostel/{hostelId}")
-    @Operation(summary = "Public: get visible reviews and average rating for a hostel")
+    @PreAuthorize("hasAnyRole('HOSTELLER','HOSTEL_STAFF')")
+    @Operation(summary = "Get visible reviews and average rating for a hostel")
     public ApiResponse<Map<String, Object>> getReviewSummary(@PathVariable Long hostelId) {
         return ApiResponse.ok(reviewService.getReviewSummary(hostelId));
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('HOSTELLER')")
     @Operation(summary = "Hosteller: submit a review for their hostel")
     public ApiResponse<HostelReview> submitReview(@RequestBody Map<String, Object> body) {
         UserPrincipal p = getPrincipal();
@@ -50,6 +53,7 @@ public class ReviewController {
     }
 
     @PatchMapping("/{reviewId}/visibility")
+    @PreAuthorize("hasRole('HOSTEL_STAFF')")
     @Operation(summary = "Staff: toggle review visibility")
     public ApiResponse<HostelReview> toggleVisibility(@PathVariable Long reviewId,
                                                         @RequestParam boolean visible) {

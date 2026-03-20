@@ -1,5 +1,7 @@
 package com.hostlify.module.expense.entity;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.hostlify.shared.entity.BaseEntity;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -7,6 +9,7 @@ import lombok.Setter;
 import org.hibernate.annotations.SQLRestriction;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 @Getter
 @Setter
@@ -28,9 +31,11 @@ public class ExpenseEmployee extends BaseEntity {
     @Column(name = "employee_code", length = 30)
     private String employeeCode;
 
+    @JsonAlias({"employeeName"})
     @Column(nullable = false, length = 150)
     private String name;
 
+    @JsonAlias({"designation"})
     @Column(nullable = false, length = 80)
     private String role;
 
@@ -42,4 +47,12 @@ public class ExpenseEmployee extends BaseEntity {
 
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal hra = BigDecimal.ZERO;
+
+    @JsonProperty("salary")
+    public BigDecimal getSalaryAlias() { return baseSalary; }
+
+    @JsonProperty("salary")
+    public void setSalaryAlias(BigDecimal salary) { this.baseSalary = salary; }
+
+    @Transient private LocalDate lastPaidDate;
 }

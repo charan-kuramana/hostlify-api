@@ -7,6 +7,7 @@ import com.hostlify.shared.dto.ApiResponse;
 import com.hostlify.shared.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
@@ -27,12 +28,14 @@ public class MenuController {
     }
 
     @GetMapping("/current")
+    @PreAuthorize("hasAnyRole('HOSTELLER','HOSTEL_STAFF')")
     @Operation(summary = "Hosteller + Staff: get current week's menu")
     public ApiResponse<WeeklyMenu> getCurrentMenu(@RequestParam Long hostelId) {
         return ApiResponse.ok(menuService.getCurrentMenu(hostelId));
     }
 
     @GetMapping("/week")
+    @PreAuthorize("hasAnyRole('HOSTELLER','HOSTEL_STAFF')")
     @Operation(summary = "Get menu for a specific week")
     public ApiResponse<WeeklyMenu> getByWeek(@RequestParam Long hostelId,
                                                @RequestParam String weekStart) {
@@ -40,12 +43,14 @@ public class MenuController {
     }
 
     @GetMapping("/{menuId}/items")
+    @PreAuthorize("hasAnyRole('HOSTELLER','HOSTEL_STAFF')")
     @Operation(summary = "Get menu items for a weekly menu")
     public ApiResponse<List<MenuItem>> getItems(@PathVariable Long menuId) {
         return ApiResponse.ok(menuService.getMenuItems(menuId));
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('HOSTEL_STAFF')")
     @Operation(summary = "Staff: create or update a weekly menu")
     public ApiResponse<WeeklyMenu> saveMenu(@RequestBody Map<String, Object> body) {
         UserPrincipal principal = getPrincipal();

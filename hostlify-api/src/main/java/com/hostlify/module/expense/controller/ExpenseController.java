@@ -5,8 +5,12 @@ import com.hostlify.module.expense.entity.ExpenseRecord;
 import com.hostlify.module.expense.entity.ExpenseSalaryRecord;
 import com.hostlify.module.expense.service.ExpenseService;
 import com.hostlify.shared.dto.ApiResponse;
+import com.hostlify.shared.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -14,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
+@PreAuthorize("hasRole('HOSTEL_STAFF')")
 @Tag(name = "Expense & Employee")
 public class ExpenseController {
 
@@ -23,11 +28,26 @@ public class ExpenseController {
         this.expenseService = expenseService;
     }
 
+    private UserPrincipal getPrincipal() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof UserPrincipal)) return null;
+        return (UserPrincipal) auth.getPrincipal();
+    }
+
     // ─── Expenses ─────────────────────────────────────────────────
 
     @PostMapping("/api/v1/expense")
     @Operation(summary = "Staff: add an expense record")
     public ApiResponse<ExpenseRecord> addExpense(@RequestBody ExpenseRecord expense) {
+        UserPrincipal p = getPrincipal();
+        if (p != null) {
+            if (expense.getHostelId() == null && p.getHostelIds() != null && !p.getHostelIds().isEmpty()) {
+                expense.setHostelId(p.getHostelIds().get(0));
+            }
+            if (expense.getRecordedBy() == null) {
+                expense.setRecordedBy(p.getUserId());
+            }
+        }
         return ApiResponse.ok(expenseService.addExpense(expense));
     }
 
@@ -51,7 +71,47 @@ public class ExpenseController {
 
     @PostMapping("/api/v1/employee")
     @Operation(summary = "Staff: add a new employee")
-    public ApiResponse<ExpenseEmployee> addEmployee(@RequestBody ExpenseEmployee employee) {
+    public ApiResponse<ExpenseEmployee> addEmployee(@RequestBody Map<String, Object> body) {
+        UserPrincipal p = getPrincipal();
+
+        ExpenseEmployee employee = new ExpenseEmployee();
+
+        // hostelId: from body or JWT
+        if (body.get("hostelId") != null) {
+            employee.setHostelId(((Number) body.get("hostelId")).longValue());
+        } else if (p != null && p.getHostelIds() != null && !p.getHostelIds().isEmpty()) {
+            employee.setHostelId(p.getHostelIds().get(0));
+        }
+
+        // name: accept "employeeName" or "name"
+        String name = body.containsKey("employeeName") ? (String) body.get("employeeName")
+                : (String) body.get("name");
+        employee.setName(name);
+
+        // role: accept "designation" or "role"
+        String role = body.containsKey("designation") ? (String) body.get("designation")
+                : (String) body.get("role");
+        employee.setRole(role);
+
+        // baseSalary: accept "salary" or "baseSalary"
+        Object salaryRaw = body.containsKey("salary") ? body.get("salary") : body.get("baseSalary");
+        if (salaryRaw != null) {
+            employee.setBaseSalary(new BigDecimal(salaryRaw.toString()));
+        } else {
+            employee.setBaseSalary(BigDecimal.ZERO);
+        }
+
+        // Optional fields
+        if (body.get("mobile") != null) employee.setMobile((String) body.get("mobile"));
+        if (body.get("employeeCode") != null) employee.setEmployeeCode((String) body.get("employeeCode"));
+
+        if (employee.getHostelId() == null)
+            throw new com.hostlify.shared.exception.AppException("hostelId is required", org.springframework.http.HttpStatus.BAD_REQUEST);
+        if (employee.getName() == null || employee.getName().isBlank())
+            throw new com.hostlify.shared.exception.AppException("employeeName is required", org.springframework.http.HttpStatus.BAD_REQUEST);
+        if (employee.getRole() == null || employee.getRole().isBlank())
+            throw new com.hostlify.shared.exception.AppException("designation is required", org.springframework.http.HttpStatus.BAD_REQUEST);
+
         return ApiResponse.ok(expenseService.addEmployee(employee));
     }
 
@@ -83,7 +143,9 @@ public class ExpenseController {
                                                           @RequestBody Map<String, Object> body) {
         int month = ((Number) body.get("month")).intValue();
         int year = ((Number) body.get("year")).intValue();
-        BigDecimal gross = new BigDecimal(body.get("grossSalary").toString());
+        // Accept "amount" (frontend) or "grossSalary" (direct API) as the gross salary
+        Object rawGross = body.getOrDefault("grossSalary", body.get("amount"));
+        BigDecimal gross = rawGross != null ? new BigDecimal(rawGross.toString()) : BigDecimal.ZERO;
         BigDecimal deductions = body.get("deductions") != null ?
                 new BigDecimal(body.get("deductions").toString()) : BigDecimal.ZERO;
         return ApiResponse.ok(expenseService.recordSalary(employeeId, month, year, gross, deductions));

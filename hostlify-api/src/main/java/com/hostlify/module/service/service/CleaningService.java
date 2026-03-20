@@ -1,5 +1,7 @@
 package com.hostlify.module.service.service;
 
+import com.hostlify.module.booking.repository.BookingCheckinRepository;
+import com.hostlify.module.hosteller.repository.HostellerProfileRepository;
 import com.hostlify.module.service.entity.CleaningRequest;
 import com.hostlify.module.service.repository.CleaningRequestRepository;
 import com.hostlify.shared.exception.AppException;
@@ -14,13 +16,24 @@ import java.util.List;
 public class CleaningService {
 
     private final CleaningRequestRepository cleaningRepo;
+    private final HostellerProfileRepository profileRepo;
+    private final BookingCheckinRepository bookingRepo;
 
-    public CleaningService(CleaningRequestRepository cleaningRepo) {
+    public CleaningService(CleaningRequestRepository cleaningRepo,
+                           HostellerProfileRepository profileRepo,
+                           BookingCheckinRepository bookingRepo) {
         this.cleaningRepo = cleaningRepo;
+        this.profileRepo = profileRepo;
+        this.bookingRepo = bookingRepo;
     }
 
     public List<CleaningRequest> getByHostel(Long hostelId) {
-        return cleaningRepo.findByHostelIdOrderByCreatedAtDesc(hostelId);
+        List<CleaningRequest> list = cleaningRepo.findByHostelIdOrderByCreatedAtDesc(hostelId);
+        list.forEach(item -> {
+            profileRepo.findById(item.getHostellerId()).ifPresent(p ->
+                item.setHostellerName(p.getFirstName() + " " + (p.getLastName() != null ? p.getLastName() : "").trim()));
+        });
+        return list;
     }
 
     public List<CleaningRequest> getByHostelAndStatus(Long hostelId, String status) {
@@ -33,9 +46,17 @@ public class CleaningService {
 
     @Transactional
     public CleaningRequest submitRequest(Long hostellerId, Long hostelId, String roomNumber, String notes) {
+        // Resolve hostelId from active booking if not provided in JWT
+        Long resolvedHostelId = hostelId;
+        if (resolvedHostelId == null) {
+            resolvedHostelId = bookingRepo.findFirstByHostellerIdAndStatus(hostellerId, "ACTIVE")
+                    .map(b -> b.getHostelId())
+                    .orElse(null);
+        }
+
         CleaningRequest req = new CleaningRequest();
         req.setHostellerId(hostellerId);
-        req.setHostelId(hostelId);
+        req.setHostelId(resolvedHostelId);
         req.setRoomNumber(roomNumber);
         req.setRequestDate(LocalDate.now());
         req.setNotes(notes);

@@ -21,4 +21,28 @@ public interface BedRepository extends JpaRepository<Bed, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT b FROM Bed b WHERE b.id = :bedId")
     Optional<Bed> findByIdForUpdate(@Param("bedId") Long bedId);
+
+    long countByHostelIdAndStatus(Long hostelId, String status);
+    long countByRoomIdAndStatus(Long roomId, String status);
+
+    /** Count beds on a specific floor via JOIN through hostel_rooms */
+    @Query(value = "SELECT COUNT(*) FROM hostel_beds b " +
+            "JOIN hostel_rooms r ON b.room_id = r.id " +
+            "WHERE b.hostel_id = :hostelId AND r.floor_id = :floorId " +
+            "AND b.status = :status AND b.is_deleted = 0 AND r.is_deleted = 0",
+            nativeQuery = true)
+    long countByHostelIdAndFloorIdAndStatus(@Param("hostelId") Long hostelId,
+                                             @Param("floorId") Long floorId,
+                                             @Param("status") String status);
+
+    @Query(value = "SELECT COUNT(*) FROM hostel_beds b " +
+            "JOIN hostel_rooms r ON b.room_id = r.id " +
+            "WHERE b.hostel_id = :hostelId AND r.floor_id = :floorId " +
+            "AND b.is_deleted = 0 AND r.is_deleted = 0",
+            nativeQuery = true)
+    long countByHostelIdAndFloorId(@Param("hostelId") Long hostelId,
+                                    @Param("floorId") Long floorId);
+
+    @Query("SELECT b FROM Bed b WHERE b.roomId = :roomId")
+    List<Bed> findAllByRoomId(@Param("roomId") Long roomId);
 }

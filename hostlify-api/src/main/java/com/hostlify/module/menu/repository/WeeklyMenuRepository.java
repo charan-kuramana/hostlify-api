@@ -11,5 +11,6 @@ import java.util.Optional;
 @Repository
 public interface WeeklyMenuRepository extends JpaRepository<WeeklyMenu, Long> {
     Optional<WeeklyMenu> findByHostelIdAndWeekStart(Long hostelId, LocalDate weekStart);
+    boolean existsByHostelIdAndWeekStart(Long hostelId, LocalDate weekStart);
     List<WeeklyMenu> findByHostelIdOrderByWeekStartDesc(Long hostelId);
 }

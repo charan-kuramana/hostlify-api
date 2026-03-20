@@ -46,4 +46,8 @@ public class CleaningRequest extends BaseEntity {
 
     @Column(name = "completed_by")
     private Long completedBy;
+
+    @Transient private String hostellerName;
+
+    public java.time.LocalDate getPreferredDate() { return requestDate; }
 }

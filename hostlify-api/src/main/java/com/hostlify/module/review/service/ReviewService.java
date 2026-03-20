@@ -1,5 +1,6 @@
 package com.hostlify.module.review.service;
 
+import com.hostlify.module.hosteller.repository.HostellerProfileRepository;
 import com.hostlify.module.review.entity.HostelReview;
 import com.hostlify.module.review.repository.HostelReviewRepository;
 import com.hostlify.shared.exception.AppException;
@@ -14,13 +15,21 @@ import java.util.Map;
 public class ReviewService {
 
     private final HostelReviewRepository reviewRepo;
+    private final HostellerProfileRepository profileRepo;
 
-    public ReviewService(HostelReviewRepository reviewRepo) {
+    public ReviewService(HostelReviewRepository reviewRepo,
+                         HostellerProfileRepository profileRepo) {
         this.reviewRepo = reviewRepo;
+        this.profileRepo = profileRepo;
     }
 
     public List<HostelReview> getVisibleReviews(Long hostelId) {
-        return reviewRepo.findByHostelIdAndIsVisibleTrue(hostelId);
+        List<HostelReview> list = reviewRepo.findByHostelIdAndIsVisibleTrue(hostelId);
+        list.forEach(item -> {
+            profileRepo.findById(item.getHostellerId()).ifPresent(p ->
+                item.setHostellerName(p.getFirstName() + " " + (p.getLastName() != null ? p.getLastName() : "").trim()));
+        });
+        return list;
     }
 
     public Double getAverageRating(Long hostelId) {

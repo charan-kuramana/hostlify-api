@@ -8,6 +8,7 @@ import com.hostlify.shared.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
@@ -27,6 +28,7 @@ public class CleaningController {
     }
 
     @GetMapping("/hostel/{hostelId}")
+    @PreAuthorize("hasRole('HOSTEL_STAFF')")
     @Operation(summary = "Staff: list all cleaning requests for a hostel")
     public ApiResponse<List<CleaningRequest>> getByHostel(@PathVariable Long hostelId,
                                                             @RequestParam(required = false) String status) {
@@ -37,6 +39,7 @@ public class CleaningController {
     }
 
     @GetMapping("/me")
+    @PreAuthorize("hasRole('HOSTELLER')")
     @Operation(summary = "Hosteller: get my cleaning requests")
     public ApiResponse<List<CleaningRequest>> getMyRequests() {
         UserPrincipal p = getPrincipal();
@@ -44,6 +47,7 @@ public class CleaningController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('HOSTELLER')")
     @Operation(summary = "Hosteller: submit a cleaning request")
     public ApiResponse<CleaningRequest> submit(@RequestBody Map<String, Object> body) {
         UserPrincipal p = getPrincipal();
@@ -55,6 +59,7 @@ public class CleaningController {
     }
 
     @PatchMapping("/{requestId}/status")
+    @PreAuthorize("hasRole('HOSTEL_STAFF')")
     @Operation(summary = "Staff: update a cleaning request status (PENDING/IN_PROGRESS/COMPLETED/CANCELLED)")
     public ApiResponse<CleaningRequest> updateStatus(@PathVariable Long requestId,
                                                       @RequestBody Map<String, Object> body) {

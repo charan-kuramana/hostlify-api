@@ -4,15 +4,12 @@ import com.hostlify.module.menu.entity.MenuItem;
 import com.hostlify.module.menu.entity.WeeklyMenu;
 import com.hostlify.module.menu.repository.MenuItemRepository;
 import com.hostlify.module.menu.repository.WeeklyMenuRepository;
-import com.hostlify.shared.exception.AppException;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Map;
 
 @Service
 public class MenuService {
@@ -28,12 +25,12 @@ public class MenuService {
     public WeeklyMenu getCurrentMenu(Long hostelId) {
         LocalDate weekStart = LocalDate.now().with(DayOfWeek.MONDAY);
         return menuRepo.findByHostelIdAndWeekStart(hostelId, weekStart)
-                .orElseThrow(() -> new AppException("No menu found for current week", HttpStatus.NOT_FOUND));
+                .orElse(null);
     }
 
     public WeeklyMenu getMenuByWeek(Long hostelId, LocalDate weekStart) {
         return menuRepo.findByHostelIdAndWeekStart(hostelId, weekStart)
-                .orElseThrow(() -> new AppException("No menu found for this week", HttpStatus.NOT_FOUND));
+                .orElse(null);
     }
 
     public List<MenuItem> getMenuItems(Long menuId) {

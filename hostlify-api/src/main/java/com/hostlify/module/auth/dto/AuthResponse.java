@@ -14,13 +14,16 @@ public class AuthResponse {
     private String subRole;
     private String email;
 
-    public AuthResponse() {}
+    // Hosteller-specific context (populated when role=HOSTELLER)
+    private Long hostelId;
+    private Long hostellerProfileId;
+    private Long bookingId;
 
-    public AuthResponse(String accessToken, String refreshToken, String role) {
-        this.accessToken = accessToken;
-        this.refreshToken = refreshToken;
-        this.role = role;
-    }
+    // Staff-specific context (populated when role=HOSTEL_STAFF)
+    private java.util.List<Long> hostelIds;
+    private Long ownerId;
+
+    public AuthResponse() {}
 
     public AuthResponse(String accessToken, String refreshToken, String role, String subRole, String email) {
         this.accessToken = accessToken;

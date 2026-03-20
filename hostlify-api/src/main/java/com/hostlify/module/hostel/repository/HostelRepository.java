@@ -10,4 +10,5 @@ import java.util.List;
 public interface HostelRepository extends JpaRepository<Hostel, Long> {
     List<Hostel> findByOwnerId(Long ownerId);
     List<Hostel> findByCityAndIsDeletedFalse(String city);
+    boolean existsByName(String name);
 }
