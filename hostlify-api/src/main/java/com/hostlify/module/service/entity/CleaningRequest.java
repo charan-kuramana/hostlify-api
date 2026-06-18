@@ -18,7 +18,7 @@ import java.time.LocalDate;
         @Index(name = "idx_scr_hostel_id",    columnList = "hostel_id")
     }
 )
-@SQLRestriction("is_deleted = 0")
+@SQLRestriction("is_deleted = false")
 public class CleaningRequest extends BaseEntity {
 
     @Id

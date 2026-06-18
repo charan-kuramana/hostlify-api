@@ -126,6 +126,7 @@ public class HostelSetupService {
             long available = bedRepo.countByHostelIdAndFloorIdAndStatus(hostelId, floor.getId(), "AVAILABLE");
             long total = bedRepo.countByHostelIdAndFloorId(hostelId, floor.getId());
             Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", floor.getId());          // alias so frontend can read .id
             m.put("floorId", floor.getId());
             m.put("floorName", floor.getFloorName());
             m.put("floorNumber", floor.getFloorNumber());
@@ -148,13 +149,64 @@ public class HostelSetupService {
                     .findFirst()
                     .orElse(room.getRentAmount());
             Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", room.getId());           // alias so frontend can read .id
             m.put("roomId", room.getId());
             m.put("roomName", room.getRoomName());
             m.put("roomType", room.getRoomType());
             m.put("capacity", room.getCapacity());
             m.put("availableBeds", available);
             m.put("rentAmount", rent);
+            m.put("beds", bedSummaries(room.getId()));   // per-bed status for color map
             result.add(m);
+        }
+        return result;
+    }
+
+    /** Lightweight per-bed summary used by the booking bed-map and admin structure view. */
+    private List<Map<String, Object>> bedSummaries(Long roomId) {
+        List<Bed> beds = bedRepo.findByRoomIdOrderByBedNameAsc(roomId);
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Bed b : beds) {
+            Map<String, Object> bm = new LinkedHashMap<>();
+            bm.put("id", b.getId());
+            bm.put("bedName", b.getBedName());
+            bm.put("status", b.getStatus());
+            out.add(bm);
+        }
+        return out;
+    }
+
+    /**
+     * Full nested hostel structure for the staff "Floors & Rooms" management screen:
+     * floors → rooms → beds, with per-room occupancy counts.
+     */
+    public List<Map<String, Object>> getHostelStructure(Long hostelId) {
+        List<Floor> floors = floorRepo.findByHostelIdOrderByFloorNumberAsc(hostelId);
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Floor floor : floors) {
+            List<Room> rooms = roomRepo.findByFloorIdOrderByRoomNameAsc(floor.getId());
+            List<Map<String, Object>> roomMaps = new ArrayList<>();
+            for (Room room : rooms) {
+                List<Map<String, Object>> beds = bedSummaries(room.getId());
+                long occupied = beds.stream().filter(b -> "OCCUPIED".equals(b.get("status"))).count();
+                long reserved = beds.stream().filter(b -> "RESERVED".equals(b.get("status"))).count();
+                Map<String, Object> rm = new LinkedHashMap<>();
+                rm.put("id", room.getId());
+                rm.put("roomNumber", room.getRoomName());
+                rm.put("type", room.getRoomType());
+                rm.put("capacity", room.getCapacity());
+                rm.put("totalBeds", beds.size());
+                rm.put("occupiedBeds", occupied);
+                rm.put("reservedBeds", reserved);
+                rm.put("beds", beds);
+                roomMaps.add(rm);
+            }
+            Map<String, Object> fm = new LinkedHashMap<>();
+            fm.put("id", floor.getId());
+            fm.put("floorName", floor.getFloorName());
+            fm.put("floorNumber", floor.getFloorNumber());
+            fm.put("rooms", roomMaps);
+            result.add(fm);
         }
         return result;
     }

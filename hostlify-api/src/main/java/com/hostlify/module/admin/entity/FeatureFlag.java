@@ -16,7 +16,7 @@ import org.hibernate.annotations.SQLRestriction;
         @Index(name = "idx_aff_flag_name", columnList = "flag_name")
     }
 )
-@SQLRestriction("is_deleted = 0")
+@SQLRestriction("is_deleted = false")
 public class FeatureFlag extends BaseEntity {
 
     @Id

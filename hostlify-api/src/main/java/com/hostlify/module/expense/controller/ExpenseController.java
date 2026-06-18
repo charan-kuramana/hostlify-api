@@ -158,4 +158,12 @@ public class ExpenseController {
                                                                        @RequestParam int year) {
         return ApiResponse.ok(expenseService.getMonthlySalariesForHostel(hostelId, month, year));
     }
+
+    @GetMapping("/api/v1/employee/payroll/hostel/{hostelId}")
+    @Operation(summary = "Staff: payroll summary (payable/paid/pending per employee) for a month")
+    public ApiResponse<Map<String, Object>> getPayroll(@PathVariable Long hostelId,
+                                                        @RequestParam int month,
+                                                        @RequestParam int year) {
+        return ApiResponse.ok(expenseService.getPayrollSummary(hostelId, month, year));
+    }
 }

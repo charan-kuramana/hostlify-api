@@ -19,7 +19,7 @@ import java.time.LocalDate;
         @Index(name = "idx_ann_valid_from", columnList = "valid_from")
     }
 )
-@SQLRestriction("is_deleted = 0")
+@SQLRestriction("is_deleted = false")
 public class Announcement extends BaseEntity {
 
     @Id

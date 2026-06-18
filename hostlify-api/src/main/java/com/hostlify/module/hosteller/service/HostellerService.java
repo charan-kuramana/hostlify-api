@@ -63,10 +63,20 @@ public class HostellerService {
     @Transactional
     public HostellerProfile update(Long id, HostellerProfile req) {
         HostellerProfile existing = getById(id);
-        existing.setFirstName(req.getFirstName());
-        existing.setLastName(req.getLastName());
-        existing.setMobile(req.getMobile());
-        existing.setDateOfBirth(req.getDateOfBirth());
+        // Copy all editable personal-detail fields (only when provided, so partial updates don't wipe).
+        if (req.getFirstName() != null)        existing.setFirstName(req.getFirstName());
+        if (req.getLastName() != null)         existing.setLastName(req.getLastName());
+        if (req.getMobile() != null)           existing.setMobile(req.getMobile());
+        if (req.getAltMobile() != null)        existing.setAltMobile(req.getAltMobile());
+        if (req.getGender() != null)           existing.setGender(req.getGender());
+        if (req.getDateOfBirth() != null)      existing.setDateOfBirth(req.getDateOfBirth());
+        if (req.getUserType() != null)         existing.setUserType(req.getUserType());
+        if (req.getCompanyCollege() != null)   existing.setCompanyCollege(req.getCompanyCollege());
+        if (req.getPermanentAddress() != null) existing.setPermanentAddress(req.getPermanentAddress());
+        if (req.getCity() != null)             existing.setCity(req.getCity());
+        if (req.getPincode() != null)          existing.setPincode(req.getPincode());
+        if (req.getIdProofType() != null)      existing.setIdProofType(req.getIdProofType());
+        if (req.getIdProofNumber() != null)    existing.setIdProofNumber(req.getIdProofNumber());
         return profileRepo.save(existing);
     }
 
@@ -82,6 +92,24 @@ public class HostellerService {
         HostellerProfile profile = getById(hostellerId);
         profile.setIdProofUrl(blobPath);
         return profileRepo.save(profile);
+    }
+
+    // ─── Emergency contact ──────────────────────────────────────────────────
+    public com.hostlify.module.hosteller.entity.HostellerEmergencyContact getEmergencyContact(Long hostellerId) {
+        return emergencyRepo.findFirstByHostellerId(hostellerId).orElse(null);
+    }
+
+    @Transactional
+    public com.hostlify.module.hosteller.entity.HostellerEmergencyContact upsertEmergencyContact(
+            Long hostellerId, com.hostlify.module.hosteller.entity.HostellerEmergencyContact req) {
+        var c = emergencyRepo.findFirstByHostellerId(hostellerId)
+                .orElseGet(com.hostlify.module.hosteller.entity.HostellerEmergencyContact::new);
+        c.setHostellerId(hostellerId);
+        if (req.getName() != null) c.setName(req.getName());
+        if (req.getRelationship() != null) c.setRelationship(req.getRelationship());
+        if (req.getMobile() != null) c.setMobile(req.getMobile());
+        if (req.getAltMobile() != null) c.setAltMobile(req.getAltMobile());
+        return emergencyRepo.save(c);
     }
 
     public Map<String, Object> getProfileCompletion(Long authUserId) {

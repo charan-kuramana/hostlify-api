@@ -19,7 +19,7 @@ import java.time.LocalDateTime;
         @Index(name = "idx_br_status", columnList = "status")
     }
 )
-@SQLRestriction("is_deleted = 0")
+@SQLRestriction("is_deleted = false")
 public class BookingRequest extends BaseEntity {
 
     @Id

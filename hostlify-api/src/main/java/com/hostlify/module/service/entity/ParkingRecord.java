@@ -18,7 +18,7 @@ import java.time.LocalDateTime;
         @Index(name = "idx_sp_hostel_id",    columnList = "hostel_id")
     }
 )
-@SQLRestriction("is_deleted = 0")
+@SQLRestriction("is_deleted = false")
 public class ParkingRecord extends BaseEntity {
 
     @Id

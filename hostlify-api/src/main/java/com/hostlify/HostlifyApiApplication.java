@@ -9,6 +9,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 public class HostlifyApiApplication {
 
 	public static void main(String[] args) {
+		DatabaseBootstrap.ensureDatabaseExists();
 		SpringApplication.run(HostlifyApiApplication.class, args);
 	}
 

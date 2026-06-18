@@ -14,6 +14,8 @@ import com.hostlify.module.hostel.repository.HostelRepository;
 import com.hostlify.module.hostel.repository.RoomRepository;
 import com.hostlify.module.hosteller.entity.HostellerProfile;
 import com.hostlify.module.hosteller.repository.HostellerProfileRepository;
+import com.hostlify.module.payment.entity.PaymentDue;
+import com.hostlify.module.payment.repository.PaymentDueRepository;
 import com.hostlify.shared.exception.AppException;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
@@ -34,6 +36,7 @@ public class BookingService {
     private final AuthUserRepository authUserRepo;
     private final HostelRepository hostelRepo;
     private final RoomRepository roomRepo;
+    private final PaymentDueRepository dueRepo;
     private final ApplicationEventPublisher eventPublisher;
 
     public BookingService(BookingCheckinRepository bookingRepo,
@@ -42,6 +45,7 @@ public class BookingService {
                           AuthUserRepository authUserRepo,
                           HostelRepository hostelRepo,
                           RoomRepository roomRepo,
+                          PaymentDueRepository dueRepo,
                           ApplicationEventPublisher eventPublisher) {
         this.bookingRepo = bookingRepo;
         this.bedRepo = bedRepo;
@@ -49,6 +53,7 @@ public class BookingService {
         this.authUserRepo = authUserRepo;
         this.hostelRepo = hostelRepo;
         this.roomRepo = roomRepo;
+        this.dueRepo = dueRepo;
         this.eventPublisher = eventPublisher;
     }
 
@@ -77,7 +82,9 @@ public class BookingService {
         Bed bed = bedRepo.findByIdForUpdate(bedId)
                 .orElseThrow(() -> new AppException("Bed not found", HttpStatus.NOT_FOUND));
 
-        if (!"AVAILABLE".equals(bed.getStatus())) {
+        // AVAILABLE → direct staff allocation. RESERVED → approving a booking request that
+        // already reserved this bed for this hosteller. Both transition to OCCUPIED.
+        if (!"AVAILABLE".equals(bed.getStatus()) && !"RESERVED".equals(bed.getStatus())) {
             throw new AppException("Bed is not available (current status: " + bed.getStatus() + ")",
                     HttpStatus.CONFLICT);
         }
@@ -113,6 +120,24 @@ public class BookingService {
         booking.setAdvanceAmount(advanceAmount != null ? advanceAmount : BigDecimal.ZERO);
         booking.setStatus("ACTIVE");
         BookingCheckin saved = bookingRepo.save(booking);
+
+        // 6b. Generate the first rent due (move-in month) so the hosteller has something to pay.
+        LocalDate checkin = saved.getCheckinDate();
+        int month = checkin.getMonthValue();
+        int year = checkin.getYear();
+        boolean dueExists = dueRepo.findByHostellerIdAndPeriodYearAndPeriodMonth(profile.getId(), year, month).isPresent();
+        if (!dueExists) {
+            PaymentDue due = new PaymentDue();
+            due.setHostellerId(profile.getId());
+            due.setBookingId(saved.getId());
+            due.setHostelId(hostel.getId());
+            due.setPeriodMonth(month);
+            due.setPeriodYear(year);
+            due.setDueDate(checkin); // first rent is due at move-in
+            due.setRentAmount(saved.getRentAmount());
+            due.setStatus("UNPAID");
+            dueRepo.save(due);
+        }
 
         // 7. Publish event (async notification will pick it up)
         eventPublisher.publishEvent(new BookingCreatedEvent(

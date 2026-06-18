@@ -29,7 +29,7 @@ public interface BedRepository extends JpaRepository<Bed, Long> {
     @Query(value = "SELECT COUNT(*) FROM hostel_beds b " +
             "JOIN hostel_rooms r ON b.room_id = r.id " +
             "WHERE b.hostel_id = :hostelId AND r.floor_id = :floorId " +
-            "AND b.status = :status AND b.is_deleted = 0 AND r.is_deleted = 0",
+            "AND b.status = :status AND b.is_deleted = false AND r.is_deleted = false",
             nativeQuery = true)
     long countByHostelIdAndFloorIdAndStatus(@Param("hostelId") Long hostelId,
                                              @Param("floorId") Long floorId,
@@ -38,7 +38,7 @@ public interface BedRepository extends JpaRepository<Bed, Long> {
     @Query(value = "SELECT COUNT(*) FROM hostel_beds b " +
             "JOIN hostel_rooms r ON b.room_id = r.id " +
             "WHERE b.hostel_id = :hostelId AND r.floor_id = :floorId " +
-            "AND b.is_deleted = 0 AND r.is_deleted = 0",
+            "AND b.is_deleted = false AND r.is_deleted = false",
             nativeQuery = true)
     long countByHostelIdAndFloorId(@Param("hostelId") Long hostelId,
                                     @Param("floorId") Long floorId);

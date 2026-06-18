@@ -1,3 +1,6 @@
+server:
+  port: 8090
+
 spring:
   profiles:
     active: dev
@@ -7,7 +10,7 @@ spring:
     open-in-view: false
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.MySQL8Dialect
+        dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
   flyway:
     enabled: true

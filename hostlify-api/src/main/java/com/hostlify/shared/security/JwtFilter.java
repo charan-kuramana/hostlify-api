@@ -25,6 +25,20 @@ public class JwtFilter extends OncePerRequestFilter {
         this.jwtService = jwtService;
     }
 
+    /**
+     * Skip JWT processing for public endpoints. This ensures a stale/expired token left in the
+     * browser is never inspected on login/refresh, so the user can always sign in again.
+     */
+    @Override
+    protected boolean shouldNotFilter(@NonNull HttpServletRequest request) {
+        String path = request.getRequestURI();
+        return path.startsWith("/api/v1/auth/")
+                || path.startsWith("/api/payment/razorpay/webhook")
+                || path.startsWith("/actuator/")
+                || path.startsWith("/swagger-ui")
+                || path.startsWith("/v3/api-docs");
+    }
+
     @Override
     protected void doFilterInternal(
             @NonNull HttpServletRequest request,
@@ -89,10 +103,10 @@ public class JwtFilter extends OncePerRequestFilter {
                 SecurityContextHolder.getContext().setAuthentication(authToken);
             }
         } catch (Exception e) {
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.setContentType("application/json");
-            response.getWriter().write("{\"success\":false,\"error\":\"INVALID_TOKEN\",\"message\":\"Invalid or expired token\"}");
-            return;
+            // Invalid/expired token: don't authenticate. Let the request continue so Spring
+            // Security's entry point returns a 401 (which the client uses to refresh the token).
+            // Never hard-block here, or a stale token would also break public routes like login.
+            SecurityContextHolder.clearContext();
         }
 
         filterChain.doFilter(request, response);

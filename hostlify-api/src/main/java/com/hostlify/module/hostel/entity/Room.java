@@ -12,7 +12,7 @@ import java.math.BigDecimal;
 @Setter
 @Entity
 @Table(name = "hostel_rooms")
-@SQLRestriction("is_deleted=0")
+@SQLRestriction("is_deleted = false")
 public class Room extends BaseEntity {
 
     @Id

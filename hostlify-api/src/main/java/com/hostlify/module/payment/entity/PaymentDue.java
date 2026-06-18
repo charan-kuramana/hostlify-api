@@ -22,7 +22,7 @@ import java.time.LocalDate;
         @Index(name = "idx_pd_status",       columnList = "status")
     }
 )
-@SQLRestriction("is_deleted = 0")
+@SQLRestriction("is_deleted = false")
 public class PaymentDue extends BaseEntity {
 
     @Id

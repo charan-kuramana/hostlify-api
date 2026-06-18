@@ -25,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class PaymentService {
@@ -141,6 +142,96 @@ public class PaymentService {
         return orderRepo.save(order);
     }
 
+    /** Builds everything the frontend Razorpay Checkout widget needs (incl. the public key id). */
+    @Transactional
+    public Map<String, Object> initiateRazorpayCheckout(Long authUserId, Long dueId) {
+        HostellerProfile profile = profileRepo.findByAuthUserId(authUserId)
+                .orElseThrow(() -> new AppException("Profile not found", HttpStatus.NOT_FOUND));
+        PaymentRazorpayOrder order = initiateRazorpayPayment(authUserId, dueId);
+        Map<String, Object> info = new java.util.LinkedHashMap<>();
+        info.put("keyId", razorpayKeyId);
+        info.put("orderId", order.getRazorpayOrderId());
+        info.put("amountPaise", order.getAmountPaise());
+        info.put("currency", "INR");
+        info.put("dueId", dueId);
+        info.put("hostellerName", profile.getFirstName() + " " + (profile.getLastName() != null ? profile.getLastName() : "").trim());
+        info.put("description", "Hostel rent payment");
+        return info;
+    }
+
+    /** Verifies the Razorpay checkout signature, captures the payment, and returns the payment details. */
+    @Transactional
+    public Map<String, Object> verifyAndCaptureRazorpay(String razorpayPaymentId, String razorpayOrderId, String signature) {
+        PaymentRazorpayOrder rpOrder = orderRepo.findByRazorpayOrderId(razorpayOrderId)
+                .orElseThrow(() -> new AppException("Order not found", HttpStatus.NOT_FOUND));
+        String payload = razorpayOrderId + "|" + razorpayPaymentId;
+        if (!com.hostlify.shared.util.HmacUtils.verifyHmac(razorpayKeySecret, payload, signature)) {
+            throw new AppException("Payment signature verification failed", HttpStatus.BAD_REQUEST);
+        }
+        PaymentRecord rec = handleRazorpayPaymentCaptured(razorpayPaymentId, razorpayOrderId, rpOrder.getAmountPaise());
+        PaymentDue due = dueRepo.findById(rpOrder.getDueId()).orElse(null);
+
+        Map<String, Object> details = new java.util.LinkedHashMap<>();
+        details.put("status", "PAID");
+        details.put("amount", rec != null ? rec.getAmount() : null);
+        details.put("paymentId", razorpayPaymentId);
+        details.put("orderId", razorpayOrderId);
+        details.put("method", rec != null ? rec.getPaymentMethod() : "RAZORPAY");
+        details.put("paymentDate", rec != null ? rec.getPaymentDate() : null);
+        details.put("dueId", rpOrder.getDueId());
+        if (due != null) details.put("period", due.getPeriodMonth() + "/" + due.getPeriodYear());
+        return details;
+    }
+
+    // ─── Payment records (transactions) ─────────────────────────────
+
+    public List<PaymentRecord> getRecordsByHostellerAuthUser(Long authUserId) {
+        HostellerProfile profile = profileRepo.findByAuthUserId(authUserId)
+                .orElseThrow(() -> new AppException("Profile not found", HttpStatus.NOT_FOUND));
+        return recordRepo.findByHostellerIdOrderByCreatedAtDesc(profile.getId());
+    }
+
+    /** All dues (paid + unpaid) for a hostel, enriched with hosteller name + room. */
+    public List<PaymentDue> getAllDuesByHostel(Long hostelId) {
+        List<PaymentDue> dues = dueRepo.findByHostelIdOrderByDueDateDesc(hostelId);
+        dues.forEach(this::enrichDue);
+        return dues;
+    }
+
+    private void enrichDue(PaymentDue due) {
+        profileRepo.findById(due.getHostellerId()).ifPresent(p ->
+                due.setHostellerName((p.getFirstName() + " " + (p.getLastName() != null ? p.getLastName() : "")).trim()));
+        if (due.getBookingId() != null) {
+            bookingRepo.findById(due.getBookingId()).ifPresent(b ->
+                    roomRepo.findById(b.getRoomId()).ifPresent(r -> due.setRoomNumber(r.getRoomName())));
+        }
+    }
+
+    /** All payment transactions received for a hostel, enriched with payer name + room for staff. */
+    public List<Map<String, Object>> getRecordsByHostel(Long hostelId) {
+        List<PaymentRecord> records = recordRepo.findByHostelIdOrderByCreatedAtDesc(hostelId);
+        List<Map<String, Object>> out = new java.util.ArrayList<>();
+        for (PaymentRecord rec : records) {
+            Map<String, Object> m = new java.util.LinkedHashMap<>();
+            m.put("id", rec.getId());
+            m.put("amount", rec.getAmount());
+            m.put("paymentMethod", rec.getPaymentMethod());
+            m.put("transactionRef", rec.getRazorpayPaymentId() != null ? rec.getRazorpayPaymentId() : rec.getTransactionRef());
+            m.put("paymentDate", rec.getPaymentDate());
+            m.put("status", rec.getStatus());
+            m.put("notes", rec.getNotes());
+            profileRepo.findById(rec.getHostellerId()).ifPresent(p -> {
+                m.put("hostellerName", (p.getFirstName() + " " + (p.getLastName() != null ? p.getLastName() : "")).trim());
+            });
+            if (rec.getDueId() != null) {
+                dueRepo.findById(rec.getDueId()).ifPresent(d ->
+                        m.put("period", d.getPeriodMonth() + "/" + d.getPeriodYear()));
+            }
+            out.add(m);
+        }
+        return out;
+    }
+
     // ─── Cash Payment ──────────────────────────────────────────────
 
     @Transactional
@@ -189,17 +280,18 @@ public class PaymentService {
     // ─── Webhook Handler Support ────────────────────────────────────
 
     @Transactional
-    public void handleRazorpayPaymentCaptured(String razorpayPaymentId,
+    public PaymentRecord handleRazorpayPaymentCaptured(String razorpayPaymentId,
                                                String razorpayOrderId,
                                                long amountPaise) {
-        // Idempotency: skip if already recorded
-        if (recordRepo.findByRazorpayPaymentId(razorpayPaymentId).isPresent()) {
-            return;
+        // Idempotency: return the already-recorded payment if present
+        var existing = recordRepo.findByRazorpayPaymentId(razorpayPaymentId);
+        if (existing.isPresent()) {
+            return existing.get();
         }
 
         PaymentRazorpayOrder rpOrder = orderRepo.findByRazorpayOrderId(razorpayOrderId)
                 .orElse(null);
-        if (rpOrder == null) return; // Unknown order — log and skip
+        if (rpOrder == null) return null; // Unknown order — log and skip
 
         rpOrder.setStatus("PAID");
         orderRepo.save(rpOrder);
@@ -221,7 +313,7 @@ public class PaymentService {
             due.setStatus("PAID");
             dueRepo.save(due);
         }
-        recordRepo.save(record);
+        PaymentRecord saved = recordRepo.save(record);
 
         // Publish event
         HostellerProfile profile = profileRepo.findById(rpOrder.getHostellerId()).orElse(null);
@@ -233,6 +325,7 @@ public class PaymentService {
                     due.getPeriodMonth(), due.getPeriodYear()
             ));
         }
+        return saved;
     }
 
     // ─── Monthly Due Generation ─────────────────────────────────────

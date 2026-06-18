@@ -53,12 +53,31 @@ public class PaymentController {
 
     @PostMapping("/razorpay/initiate")
     @PreAuthorize("hasRole('HOSTELLER')")
-    @Operation(summary = "Hosteller: initiate Razorpay order for a due")
-    public ApiResponse<PaymentRazorpayOrder> initiateRazorpay(@RequestBody Map<String, Object> body) {
+    @Operation(summary = "Hosteller: initiate Razorpay order for a due (returns checkout info)")
+    public ApiResponse<Map<String, Object>> initiateRazorpay(@RequestBody Map<String, Object> body) {
         UserPrincipal principal = getPrincipal();
         Long dueId = ((Number) body.get("dueId")).longValue();
-        return ApiResponse.ok(paymentService.initiateRazorpayPayment(principal.getUserId(), dueId),
+        return ApiResponse.ok(paymentService.initiateRazorpayCheckout(principal.getUserId(), dueId),
                 "Razorpay order created");
+    }
+
+    @PostMapping("/razorpay/verify")
+    @PreAuthorize("hasRole('HOSTELLER')")
+    @Operation(summary = "Hosteller: verify Razorpay checkout signature and capture payment")
+    public ApiResponse<?> verifyRazorpay(@RequestBody Map<String, Object> body) {
+        String paymentId = (String) body.get("razorpayPaymentId");
+        String orderId = (String) body.get("razorpayOrderId");
+        String signature = (String) body.get("razorpaySignature");
+        Map<String, Object> details = paymentService.verifyAndCaptureRazorpay(paymentId, orderId, signature);
+        return ApiResponse.ok(details, "Payment successful");
+    }
+
+    @GetMapping("/records/my")
+    @PreAuthorize("hasRole('HOSTELLER')")
+    @Operation(summary = "Hosteller: own payment transactions")
+    public ApiResponse<List<PaymentRecord>> getMyRecords() {
+        UserPrincipal principal = getPrincipal();
+        return ApiResponse.ok(paymentService.getRecordsByHostellerAuthUser(principal.getUserId()));
     }
 
     // ─── Staff: cash payment ─────────────────────────────────────
@@ -98,6 +117,20 @@ public class PaymentController {
     @Operation(summary = "Staff: list pending dues for a hostel")
     public ApiResponse<List<PaymentDue>> getPendingByHostel(@PathVariable Long hostelId) {
         return ApiResponse.ok(paymentService.getPendingDuesByHostel(hostelId));
+    }
+
+    @GetMapping("/dues/hostel/{hostelId}/all")
+    @PreAuthorize("hasRole('HOSTEL_STAFF')")
+    @Operation(summary = "Staff: all dues (paid + unpaid) for a hostel")
+    public ApiResponse<List<PaymentDue>> getAllDuesByHostel(@PathVariable Long hostelId) {
+        return ApiResponse.ok(paymentService.getAllDuesByHostel(hostelId));
+    }
+
+    @GetMapping("/records/hostel/{hostelId}")
+    @PreAuthorize("hasRole('HOSTEL_STAFF')")
+    @Operation(summary = "Staff: all payments received for a hostel")
+    public ApiResponse<List<Map<String, Object>>> getRecordsByHostel(@PathVariable Long hostelId) {
+        return ApiResponse.ok(paymentService.getRecordsByHostel(hostelId));
     }
 
     // ─── Due adjustment & receipt ────────────────────────────────

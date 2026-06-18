@@ -61,7 +61,7 @@ public class BookingRequestController {
     @GetMapping("/requests")
     @PreAuthorize("hasRole('HOSTEL_STAFF')")
     @Operation(summary = "Staff: list all booking requests for a hostel")
-    public ApiResponse<List<BookingRequest>> getRequests(@RequestParam Long hostelId,
+    public ApiResponse<List<Map<String, Object>>> getRequests(@RequestParam Long hostelId,
                                                           @RequestParam(required = false) String status) {
         return ApiResponse.ok(requestService.getRequestsForHostel(hostelId, status));
     }

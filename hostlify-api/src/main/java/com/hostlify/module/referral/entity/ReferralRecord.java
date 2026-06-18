@@ -18,7 +18,7 @@ import java.math.BigDecimal;
         @Index(name = "idx_rr_referred_id", columnList = "referred_id")
     }
 )
-@SQLRestriction("is_deleted = 0")
+@SQLRestriction("is_deleted = false")
 public class ReferralRecord extends BaseEntity {
 
     @Id

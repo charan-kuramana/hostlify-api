@@ -19,7 +19,7 @@ import java.time.LocalDateTime;
         @Index(name = "idx_staff_assignments_owner", columnList = "owner_id")
     }
 )
-@SQLRestriction("is_deleted = 0")
+@SQLRestriction("is_deleted = false")
 public class StaffAssignment extends BaseEntity {
 
     @Id

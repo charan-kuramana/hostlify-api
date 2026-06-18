@@ -15,7 +15,7 @@ import java.math.BigDecimal;
     name = "admin_subscriptions",
     indexes = @Index(name = "idx_asub_owner_id", columnList = "owner_id")
 )
-@SQLRestriction("is_deleted = 0")
+@SQLRestriction("is_deleted = false")
 public class Subscription extends BaseEntity {
 
     @Id

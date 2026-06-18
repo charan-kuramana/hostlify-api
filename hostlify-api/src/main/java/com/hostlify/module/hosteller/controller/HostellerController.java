@@ -57,6 +57,21 @@ public class HostellerController {
         return ApiResponse.ok(hostellerService.update(id, profile));
     }
 
+    @GetMapping("/{id}/emergency-contact")
+    @PreAuthorize("hasAnyRole('HOSTELLER','HOSTEL_STAFF')")
+    @Operation(summary = "Get the hosteller's emergency contact")
+    public ApiResponse<com.hostlify.module.hosteller.entity.HostellerEmergencyContact> getEmergency(@PathVariable Long id) {
+        return ApiResponse.ok(hostellerService.getEmergencyContact(id));
+    }
+
+    @PutMapping("/{id}/emergency-contact")
+    @PreAuthorize("hasAnyRole('HOSTELLER','HOSTEL_STAFF')")
+    @Operation(summary = "Add or update the hosteller's emergency contact")
+    public ApiResponse<com.hostlify.module.hosteller.entity.HostellerEmergencyContact> upsertEmergency(
+            @PathVariable Long id, @RequestBody com.hostlify.module.hosteller.entity.HostellerEmergencyContact body) {
+        return ApiResponse.ok(hostellerService.upsertEmergencyContact(id, body), "Emergency contact saved");
+    }
+
     @PostMapping("/profile/photo")
     @PreAuthorize("hasAnyRole('HOSTEL_STAFF','HOSTELLER')")
     @Operation(summary = "Hosteller: upload a profile photo")

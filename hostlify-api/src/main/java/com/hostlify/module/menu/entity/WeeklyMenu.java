@@ -18,7 +18,7 @@ import java.time.LocalDate;
         @Index(name = "idx_mw_week_start", columnList = "week_start")
     }
 )
-@SQLRestriction("is_deleted = 0")
+@SQLRestriction("is_deleted = false")
 public class WeeklyMenu extends BaseEntity {
 
     @Id

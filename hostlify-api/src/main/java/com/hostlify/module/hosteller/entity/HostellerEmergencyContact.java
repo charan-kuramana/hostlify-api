@@ -10,7 +10,7 @@ import org.hibernate.annotations.SQLRestriction;
 @Setter
 @Entity
 @Table(name = "hosteller_emergency_contacts")
-@SQLRestriction("is_deleted=0")
+@SQLRestriction("is_deleted = false")
 public class HostellerEmergencyContact extends BaseEntity {
 
     @Id

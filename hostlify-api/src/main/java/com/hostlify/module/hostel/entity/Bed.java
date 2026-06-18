@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 @Setter
 @Entity
 @Table(name = "hostel_beds")
-@SQLRestriction("is_deleted=0")
+@SQLRestriction("is_deleted = false")
 public class Bed extends BaseEntity {
 
     @Id

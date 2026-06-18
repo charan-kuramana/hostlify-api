@@ -16,7 +16,7 @@ import java.math.BigDecimal;
     uniqueConstraints = @UniqueConstraint(name = "uk_referral_code", columnNames = "code"),
     indexes = @Index(name = "idx_rc_hosteller_id", columnList = "hosteller_id")
 )
-@SQLRestriction("is_deleted = 0")
+@SQLRestriction("is_deleted = false")
 public class ReferralCode extends BaseEntity {
 
     @Id

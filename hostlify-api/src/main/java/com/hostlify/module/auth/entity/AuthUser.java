@@ -18,7 +18,7 @@ import java.time.LocalDateTime;
         @UniqueConstraint(name = "uk_auth_users_email", columnNames = "email")
     }
 )
-@SQLRestriction("is_deleted = 0")
+@SQLRestriction("is_deleted = false")
 public class AuthUser extends BaseEntity {
 
     @Id

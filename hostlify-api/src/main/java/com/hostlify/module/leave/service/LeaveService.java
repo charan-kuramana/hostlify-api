@@ -64,4 +64,44 @@ public class LeaveService {
         leave.setReviewedAt(LocalDateTime.now());
         return leaveRepo.save(leave);
     }
+
+    /**
+     * Occupancy planning: how many residents are expected to be present in [from, to],
+     * based on active residents minus those with an APPROVED leave overlapping the range.
+     */
+    public java.util.Map<String, Object> getOccupancy(Long hostelId, java.time.LocalDate from, java.time.LocalDate to) {
+        var residents = profileRepo.findByHostelIdAndStatusOrderByCreatedAtDesc(hostelId, "ACTIVE");
+        java.util.Set<Long> residentIds = new java.util.HashSet<>();
+        residents.forEach(r -> residentIds.add(r.getId()));
+
+        var approved = leaveRepo.findByStatusOrderByCreatedAtDesc("APPROVED");
+        java.util.List<java.util.Map<String, Object>> onLeaveList = new java.util.ArrayList<>();
+        java.util.Set<Long> onLeaveIds = new java.util.HashSet<>();
+        for (LeaveRequest l : approved) {
+            if (!residentIds.contains(l.getHostellerId())) continue;
+            // overlap: leave.from <= to && leave.to >= from
+            if (!l.getFromDate().isAfter(to) && !l.getToDate().isBefore(from)) {
+                if (onLeaveIds.add(l.getHostellerId())) {
+                    java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+                    m.put("hostellerId", l.getHostellerId());
+                    profileRepo.findById(l.getHostellerId()).ifPresent(p ->
+                            m.put("name", (p.getFirstName() + " " + (p.getLastName() != null ? p.getLastName() : "")).trim()));
+                    m.put("leaveType", l.getLeaveType());
+                    m.put("fromDate", l.getFromDate());
+                    m.put("toDate", l.getToDate());
+                    onLeaveList.add(m);
+                }
+            }
+        }
+        int total = residents.size();
+        int onLeave = onLeaveIds.size();
+        java.util.Map<String, Object> out = new java.util.LinkedHashMap<>();
+        out.put("totalResidents", total);
+        out.put("onLeave", onLeave);
+        out.put("expectedOccupancy", total - onLeave);
+        out.put("from", from);
+        out.put("to", to);
+        out.put("onLeaveResidents", onLeaveList);
+        return out;
+    }
 }

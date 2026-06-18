@@ -48,6 +48,15 @@ public class LeaveController {
         return ApiResponse.ok(leaveService.getPending());
     }
 
+    @GetMapping("/occupancy")
+    @PreAuthorize("hasRole('HOSTEL_STAFF')")
+    public ApiResponse<Map<String, Object>> getOccupancy(@RequestParam Long hostelId,
+                                                          @RequestParam String from,
+                                                          @RequestParam String to) {
+        return ApiResponse.ok(leaveService.getOccupancy(hostelId,
+                java.time.LocalDate.parse(from), java.time.LocalDate.parse(to)));
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('HOSTELLER','HOSTEL_STAFF')")
     public ApiResponse<LeaveRequest> getById(@PathVariable Long id) {

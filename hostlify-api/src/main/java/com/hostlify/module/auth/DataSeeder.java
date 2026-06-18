@@ -208,6 +208,10 @@ public class DataSeeder implements CommandLineRunner {
         assignment.setAssignedBy(staffUser.getId());
         staffAssignmentRepository.save(assignment);
 
+        // ── Additional staff users (ADMIN + MANAGER sub-roles) ────────────────
+        seedStaffUser("manager@test.com", "MANAGER", hostelId, owner.getId(), staffUser.getId());
+        seedStaffUser("staffadmin@test.com", "ADMIN", hostelId, owner.getId(), staffUser.getId());
+
         // ── Floors ────────────────────────────────────────────────────────────
         Floor gFloor = makeFloor(hostelId, "Ground Floor", 0);
         Floor fFloor = makeFloor(hostelId, "1st Floor", 1);
@@ -565,6 +569,30 @@ public class DataSeeder implements CommandLineRunner {
                 menuItemRepository.save(item);
             }
         }
+    }
+
+    // ─── Helper: create additional staff user + hostel assignment ────────────
+
+    private void seedStaffUser(String email, String subRole, Long hostelId, Long ownerId, Long assignedBy) {
+        if (authUserRepository.existsByEmail(email)) return;
+        AuthUser u = new AuthUser();
+        u.setUuid(UUID.randomUUID().toString());
+        u.setEmail(email);
+        u.setPasswordHash(passwordEncoder.encode("Test@1234"));
+        u.setRole("HOSTEL_STAFF");
+        u.setSubRole(subRole);
+        u.setStatus("ACTIVE");
+        u = authUserRepository.save(u);
+
+        StaffAssignment sa = new StaffAssignment();
+        sa.setStaffUserId(u.getId());
+        sa.setHostelId(hostelId);
+        sa.setOwnerId(ownerId);
+        sa.setActive(true);
+        sa.setAssignedAt(LocalDateTime.now());
+        sa.setAssignedBy(assignedBy);
+        staffAssignmentRepository.save(sa);
+        System.out.println("[DEV] Seeded HOSTEL_STAFF (" + subRole + "): " + email + " / Test@1234");
     }
 
     // ─── Helper: create additional hosteller user + profile ──────────────────

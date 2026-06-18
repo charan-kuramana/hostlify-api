@@ -18,7 +18,7 @@ import java.time.LocalDate;
     name = "expense_employees",
     indexes = @Index(name = "idx_ee_hostel_id", columnList = "hostel_id")
 )
-@SQLRestriction("is_deleted = 0")
+@SQLRestriction("is_deleted = false")
 public class ExpenseEmployee extends BaseEntity {
 
     @Id

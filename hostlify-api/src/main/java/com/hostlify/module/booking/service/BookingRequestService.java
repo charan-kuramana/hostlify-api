@@ -114,16 +114,54 @@ public class BookingRequestService {
     }
 
     public BookingRequest getMyRequest(Long userId) {
-        return requestRepo.findFirstByHostellerUserIdAndStatusIn(userId,
-                Arrays.asList("PENDING_APPROVAL", "REASSIGNED"))
+        // Return the most recent request (any status) so the hosteller sees the live
+        // outcome — including APPROVED (→ payment) and REJECTED — not just pending ones.
+        return requestRepo.findByHostellerUserIdOrderByCreatedAtDesc(userId).stream()
+                .findFirst()
                 .orElseThrow(() -> new AppException("No active booking request found", HttpStatus.NOT_FOUND));
     }
 
-    public List<BookingRequest> getRequestsForHostel(Long hostelId, String status) {
-        if (status != null && !status.isEmpty()) {
-            return requestRepo.findByHostelIdAndStatusOrderByCreatedAtDesc(hostelId, status);
+    public List<java.util.Map<String, Object>> getRequestsForHostel(Long hostelId, String status) {
+        List<BookingRequest> requests = (status != null && !status.isEmpty())
+                ? requestRepo.findByHostelIdAndStatusOrderByCreatedAtDesc(hostelId, status)
+                : requestRepo.findByHostelIdOrderByCreatedAtDesc(hostelId);
+        List<java.util.Map<String, Object>> out = new java.util.ArrayList<>();
+        for (BookingRequest r : requests) {
+            // Privacy: personal details stay hidden until the hostel approves the booking.
+            boolean approved = "APPROVED".equals(r.getStatus());
+            java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+            m.put("id", r.getId());
+            m.put("hostellerProfileId", r.getHostellerProfileId());
+            m.put("status", r.getStatus());
+            m.put("bedId", r.getBedId());
+            m.put("roomId", r.getRoomId());
+            m.put("floorId", r.getFloorId());
+            m.put("checkInDate", r.getCheckInDate());
+            m.put("expiresAt", r.getExpiresAt());
+            m.put("preferenceNotes", r.getPreferenceNotes());
+            m.put("rejectionReason", r.getRejectionReason());
+            m.put("detailsLocked", !approved);
+            // Resolve unit names (not personal data)
+            bedRepo.findById(r.getBedId()).ifPresent(b -> m.put("bedName", b.getBedName()));
+            roomRepo.findById(r.getRoomId()).ifPresent(rm -> m.put("roomName", rm.getRoomName()));
+            floorRepo.findById(r.getFloorId()).ifPresent(f -> m.put("floorName", f.getFloorName()));
+            // Applicant identity: masked while pending, full once approved
+            profileRepo.findById(r.getHostellerProfileId()).ifPresent(p -> {
+                String first = p.getFirstName() != null ? p.getFirstName() : "";
+                String last = p.getLastName() != null ? p.getLastName() : "";
+                if (approved) {
+                    m.put("applicantName", (first + " " + last).trim());
+                    m.put("mobile", p.getMobile());
+                    m.put("email", p.getEmail());
+                } else {
+                    // first name + last initial only — no contact / ID / address exposed
+                    String masked = first + (last.isEmpty() ? "" : " " + last.charAt(0) + ".");
+                    m.put("applicantName", masked.isEmpty() ? "New Applicant" : masked);
+                }
+            });
+            out.add(m);
         }
-        return requestRepo.findByHostelIdOrderByCreatedAtDesc(hostelId);
+        return out;
     }
 
     @Transactional

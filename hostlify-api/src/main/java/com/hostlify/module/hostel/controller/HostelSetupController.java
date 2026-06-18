@@ -120,6 +120,13 @@ public class HostelSetupController {
         return ApiResponse.ok(setupService.getRoomsWithAvailability(floorId));
     }
 
+    @GetMapping("/hostels/{hostelId}/structure")
+    @PreAuthorize("hasAnyRole('HOSTELLER','HOSTEL_STAFF')")
+    @Operation(summary = "Full nested structure: floors → rooms → beds with occupancy")
+    public ApiResponse<List<Map<String, Object>>> getHostelStructure(@PathVariable Long hostelId) {
+        return ApiResponse.ok(setupService.getHostelStructure(hostelId));
+    }
+
     // ── Discovery ─────────────────────────────────────────────────────────────
 
     @GetMapping("/hostel/nearby")

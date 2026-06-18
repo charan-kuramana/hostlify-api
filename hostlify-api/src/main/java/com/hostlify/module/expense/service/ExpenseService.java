@@ -79,13 +79,59 @@ public class ExpenseService {
                 })
                 .collect(Collectors.toList());
 
+        // Include payroll for the period as an expense line (recorded salaries, net)
+        BigDecimal payroll = salaryRepo.findByHostelIdAndPeriodYearAndPeriodMonth(hostelId, year, month)
+                .stream().map(ExpenseSalaryRecord::getNetSalary)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (payroll.compareTo(BigDecimal.ZERO) > 0) {
+            Map<String, Object> pm = new LinkedHashMap<>();
+            pm.put("category", "Salary/Payroll");
+            pm.put("amount", payroll);
+            byCategoryList.add(pm);
+            byCategoryList.sort((a, b) -> ((BigDecimal) b.get("amount")).compareTo((BigDecimal) a.get("amount")));
+            total = total.add(payroll);
+        }
+
         Map<String, Object> summary = new HashMap<>();
         summary.put("total", total);
         summary.put("byCategory", byCategoryList);
         summary.put("count", records.size());
+        summary.put("payroll", payroll);
         summary.put("month", month);
         summary.put("year", year);
         return summary;
+    }
+
+    /** Per-employee payroll status for a period: payable (base+hra), paid amount, and status. */
+    public Map<String, Object> getPayrollSummary(Long hostelId, int month, int year) {
+        List<ExpenseEmployee> employees = employeeRepo.findByHostelId(hostelId);
+        List<Map<String, Object>> rows = new ArrayList<>();
+        BigDecimal totalPayable = BigDecimal.ZERO, totalPaid = BigDecimal.ZERO, totalPending = BigDecimal.ZERO;
+        for (ExpenseEmployee e : employees) {
+            BigDecimal payable = e.getBaseSalary().add(e.getHra() != null ? e.getHra() : BigDecimal.ZERO);
+            var recOpt = salaryRepo.findByEmployeeIdAndPeriodYearAndPeriodMonth(e.getId(), year, month);
+            String status = recOpt.map(ExpenseSalaryRecord::getStatus).orElse("NOT_RECORDED");
+            BigDecimal net = recOpt.map(ExpenseSalaryRecord::getNetSalary).orElse(payable);
+            boolean paid = "PAID".equals(status);
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("employeeId", e.getId());
+            m.put("name", e.getName());
+            m.put("role", e.getRole());
+            m.put("payable", net);
+            m.put("status", status);                 // PAID | PENDING | NOT_RECORDED
+            m.put("salaryRecordId", recOpt.map(ExpenseSalaryRecord::getId).orElse(null));
+            rows.add(m);
+            totalPayable = totalPayable.add(net);
+            if (paid) totalPaid = totalPaid.add(net); else totalPending = totalPending.add(net);
+        }
+        Map<String, Object> out = new HashMap<>();
+        out.put("employees", rows);
+        out.put("totalPayable", totalPayable);
+        out.put("totalPaid", totalPaid);
+        out.put("totalPending", totalPending);
+        out.put("month", month);
+        out.put("year", year);
+        return out;
     }
 
     // ─── Employees ────────────────────────────────────────────────

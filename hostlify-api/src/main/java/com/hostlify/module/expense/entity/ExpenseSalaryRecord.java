@@ -21,7 +21,7 @@ import java.time.LocalDateTime;
         @Index(name = "idx_esr_status",      columnList = "status")
     }
 )
-@SQLRestriction("is_deleted = 0")
+@SQLRestriction("is_deleted = false")
 public class ExpenseSalaryRecord extends BaseEntity {
 
     @Id

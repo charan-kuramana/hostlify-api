@@ -16,7 +16,7 @@ import org.hibernate.annotations.SQLRestriction;
         @Index(name = "idx_hvr_hostel_id",    columnList = "hostel_id")
     }
 )
-@SQLRestriction("is_deleted = 0")
+@SQLRestriction("is_deleted = false")
 public class HostelReview extends BaseEntity {
 
     @Id

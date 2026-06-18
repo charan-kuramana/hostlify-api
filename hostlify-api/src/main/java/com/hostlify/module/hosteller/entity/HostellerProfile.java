@@ -12,7 +12,7 @@ import java.time.LocalDate;
 @Setter
 @Entity
 @Table(name = "hosteller_profiles")
-@SQLRestriction("is_deleted=0")
+@SQLRestriction("is_deleted = false")
 public class HostellerProfile extends BaseEntity {
 
     @Id
@@ -36,6 +36,9 @@ public class HostellerProfile extends BaseEntity {
 
     @Column(name = "alt_mobile", length = 15)
     private String altMobile;
+
+    @Column(length = 20)
+    private String gender;
 
     @Column(name = "date_of_birth")
     private LocalDate dateOfBirth;

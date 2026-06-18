@@ -21,7 +21,7 @@ import java.time.LocalDate;
         @Index(name = "idx_booking_checkins_status", columnList = "status")
     }
 )
-@SQLRestriction("is_deleted = 0")
+@SQLRestriction("is_deleted = false")
 public class BookingCheckin extends BaseEntity {
 
     @Id

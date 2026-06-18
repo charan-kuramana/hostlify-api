@@ -20,7 +20,7 @@ import java.time.LocalDateTime;
         @Index(name = "idx_pro_status",       columnList = "status")
     }
 )
-@SQLRestriction("is_deleted = 0")
+@SQLRestriction("is_deleted = false")
 public class PaymentRazorpayOrder extends BaseEntity {
 
     @Id

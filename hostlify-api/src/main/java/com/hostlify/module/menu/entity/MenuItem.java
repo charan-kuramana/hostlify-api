@@ -13,7 +13,7 @@ import org.hibernate.annotations.SQLRestriction;
     name = "menu_items",
     indexes = @Index(name = "idx_mi_menu_id", columnList = "menu_id")
 )
-@SQLRestriction("is_deleted = 0")
+@SQLRestriction("is_deleted = false")
 public class MenuItem extends BaseEntity {
 
     @Id

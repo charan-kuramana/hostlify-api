@@ -13,6 +13,7 @@ public interface PaymentDueRepository extends JpaRepository<PaymentDue, Long> {
     List<PaymentDue> findByBookingId(Long bookingId);
     List<PaymentDue> findByHostellerIdOrderByDueDateDesc(Long hostellerId);
     List<PaymentDue> findByHostelIdAndStatus(Long hostelId, String status);
+    List<PaymentDue> findByHostelIdOrderByDueDateDesc(Long hostelId);
     java.util.Optional<PaymentDue> findByHostellerIdAndPeriodYearAndPeriodMonth(Long hostellerId, int year, int month);
     List<PaymentDue> findByStatusAndDueDateBefore(String status, java.time.LocalDate date);
 }
