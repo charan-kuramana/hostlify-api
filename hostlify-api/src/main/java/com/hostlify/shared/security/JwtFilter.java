@@ -20,9 +20,12 @@ import java.util.Collections;
 public class JwtFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
+    private final com.hostlify.module.auth.repository.AuthUserRepository authUserRepository;
 
-    public JwtFilter(JwtService jwtService) {
+    public JwtFilter(JwtService jwtService,
+                     com.hostlify.module.auth.repository.AuthUserRepository authUserRepository) {
         this.jwtService = jwtService;
+        this.authUserRepository = authUserRepository;
     }
 
     /**
@@ -58,6 +61,16 @@ public class JwtFilter extends OncePerRequestFilter {
 
         try {
             Claims claims = jwtService.validateToken(jwt);
+            // Refresh tokens are not access tokens
+            if ("refresh".equals(claims.get("typ", String.class)) || claims.get("role") == null) {
+                throw new IllegalStateException("refresh token used as access token");
+            }
+            // A suspended / deactivated / deleted account loses access immediately, not when its token expires
+            String currentStatus = authUserRepository.findByUuid(claims.getSubject())
+                    .map(com.hostlify.module.auth.entity.AuthUser::getStatus).orElse(null);
+            if (currentStatus == null || "SUSPENDED".equals(currentStatus) || "INACTIVE".equals(currentStatus)) {
+                throw new IllegalStateException("account not active");
+            }
             if (SecurityContextHolder.getContext().getAuthentication() == null) {
                 String role = claims.get("role", String.class);
 

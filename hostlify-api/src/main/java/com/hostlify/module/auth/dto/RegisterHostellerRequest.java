@@ -2,6 +2,7 @@ package com.hostlify.module.auth.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
@@ -24,6 +25,7 @@ public class RegisterHostellerRequest {
     private String password;
 
     @NotBlank(message = "Mobile number is required")
+    @Pattern(regexp = "^[6-9]\\d{9}$", message = "Enter a valid 10-digit mobile number")
     private String mobile;
 
     private String gender;

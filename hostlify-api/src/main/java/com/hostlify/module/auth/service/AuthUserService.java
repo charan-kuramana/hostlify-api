@@ -34,6 +34,20 @@ public class AuthUserService {
     private static final int MAX_FAILED_ATTEMPTS = 5;
     private static final int LOCKOUT_MINUTES = 30;
     private static final int OTP_EXPIRY_MINUTES = 15;
+    private static final int MAX_OTP_ATTEMPTS = 5;
+
+    /** Wrong-guess counter per OTP id (in-memory; an OTP lives 15 minutes at most). */
+    private final Map<Long, Integer> otpFailures = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private static String normalizeEmail(String email) {
+        return email == null ? null : email.trim().toLowerCase();
+    }
+
+    private static String lockedMessage(LocalDateTime until) {
+        return "Too many failed login attempts. Your account is locked until "
+                + until.format(java.time.format.DateTimeFormatter.ofPattern("d MMM, h:mm a", java.util.Locale.ENGLISH))
+                + ". Try again later or reset your password.";
+    }
 
     private final AuthUserRepository userRepository;
     private final JwtService jwtService;
@@ -64,6 +78,7 @@ public class AuthUserService {
 
     @Transactional
     public AuthResponse registerHosteller(RegisterHostellerRequest request) {
+        request.setEmail(normalizeEmail(request.getEmail()));
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new AppException("Email already registered", HttpStatus.CONFLICT);
         }
@@ -91,9 +106,10 @@ public class AuthUserService {
         return buildAuthResponse(user);
     }
 
-    @Transactional
+    // noRollbackFor: the failed-attempt counter / lock must be persisted even though we throw
+    @Transactional(noRollbackFor = AppException.class)
     public AuthResponse login(LoginRequest request, String expectedRole) {
-        AuthUser user = userRepository.findByEmail(request.getEmail())
+        AuthUser user = userRepository.findByEmail(normalizeEmail(request.getEmail()))
                 .orElseThrow(() -> new AppException("Invalid credentials", HttpStatus.UNAUTHORIZED));
 
         if (!expectedRole.equals(user.getRole())) {
@@ -102,7 +118,7 @@ public class AuthUserService {
 
         // Check account lock
         if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(LocalDateTime.now())) {
-            throw new AppException("Account locked. Try again after " + user.getLockedUntil(), HttpStatus.FORBIDDEN);
+            throw new AppException(lockedMessage(user.getLockedUntil()), HttpStatus.FORBIDDEN);
         }
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
@@ -111,19 +127,26 @@ public class AuthUserService {
             if (attempts >= MAX_FAILED_ATTEMPTS) {
                 user.setLockedUntil(LocalDateTime.now().plusMinutes(LOCKOUT_MINUTES));
                 user.setFailedAttempts(0);
+                userRepository.save(user);
+                throw new AppException(lockedMessage(user.getLockedUntil()), HttpStatus.FORBIDDEN);
             }
             userRepository.save(user);
-            throw new AppException("Invalid credentials", HttpStatus.UNAUTHORIZED);
+            int left = MAX_FAILED_ATTEMPTS - attempts;
+            throw new AppException(left <= 2
+                    ? "Invalid credentials. " + left + " attempt" + (left == 1 ? "" : "s") + " left before your account is locked."
+                    : "Invalid credentials", HttpStatus.UNAUTHORIZED);
         }
 
-        if ("PENDING".equals(user.getStatus()) && "HOSTELLER".equals(expectedRole)) {
-            throw new AppException("Account pending admin approval", HttpStatus.FORBIDDEN);
+        // PENDING hostellers may log in: they need access to Discover / Book / Booking Status
+        // to request a bed. Their token simply carries no hostelId until a bed is allocated.
+        if ("PENDING".equals(user.getStatus()) && !"HOSTELLER".equals(expectedRole)) {
+            throw new AppException("Account pending approval", HttpStatus.FORBIDDEN);
         }
         if ("SUSPENDED".equals(user.getStatus())) {
-            throw new AppException("Account suspended", HttpStatus.FORBIDDEN);
+            throw new AppException("Your account has been suspended. Please contact Hostlify support.", HttpStatus.FORBIDDEN);
         }
         if ("INACTIVE".equals(user.getStatus())) {
-            throw new AppException("Account inactive", HttpStatus.FORBIDDEN);
+            throw new AppException("Your account is inactive. Please contact your hostel or Hostlify support.", HttpStatus.FORBIDDEN);
         }
 
         // Reset failed attempts on success
@@ -137,8 +160,10 @@ public class AuthUserService {
 
     @Transactional
     public void forgotPassword(String email) {
-        AuthUser user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new AppException("If your email exists, you will receive an OTP shortly", HttpStatus.OK));
+        email = normalizeEmail(email);
+        // Unknown email: respond exactly like a known one so accounts can't be enumerated
+        AuthUser user = userRepository.findByEmail(email).orElse(null);
+        if (user == null) return;
 
         String otp = String.format("%06d", new Random().nextInt(1000000));
         OtpToken token = new OtpToken();
@@ -152,22 +177,35 @@ public class AuthUserService {
         System.out.println("[DEV] OTP for " + email + ": " + otp);
     }
 
-    @Transactional
+    // noRollbackFor: burning an OTP after too many wrong guesses must be persisted
+    @Transactional(noRollbackFor = AppException.class)
     public void resetPassword(String email, String otpCode, String newPassword) {
-        AuthUser user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new AppException("Invalid request", HttpStatus.BAD_REQUEST));
+        if (newPassword.length() < 8) {
+            throw new AppException("Password must be at least 8 characters", HttpStatus.BAD_REQUEST);
+        }
+        AuthUser user = userRepository.findByEmail(normalizeEmail(email))
+                .orElseThrow(() -> new AppException("Invalid or expired OTP", HttpStatus.BAD_REQUEST));
 
         OtpToken otp = otpTokenRepository
                 .findTopByUserIdAndPurposeAndIsUsedFalseOrderByCreatedAtDesc(user.getId(), "PASSWORD_RESET")
-                .orElseThrow(() -> new AppException("OTP not found or already used", HttpStatus.BAD_REQUEST));
+                .orElseThrow(() -> new AppException("OTP not found or already used. Please request a new OTP.", HttpStatus.BAD_REQUEST));
 
         if (otp.getExpiresAt().isBefore(LocalDateTime.now())) {
-            throw new AppException("OTP has expired", HttpStatus.BAD_REQUEST);
+            throw new AppException("OTP has expired. Please request a new OTP.", HttpStatus.BAD_REQUEST);
         }
-        if (!otp.getOtpCode().equals(otpCode)) {
+        if (!otp.getOtpCode().equals(otpCode == null ? null : otpCode.trim())) {
+            // Limit guesses per OTP so the 6-digit code can't be brute-forced
+            int wrong = otpFailures.merge(otp.getId(), 1, Integer::sum);
+            if (wrong >= MAX_OTP_ATTEMPTS) {
+                otpFailures.remove(otp.getId());
+                otp.setUsed(true);
+                otpTokenRepository.save(otp);
+                throw new AppException("Too many invalid attempts. Please request a new OTP.", HttpStatus.BAD_REQUEST);
+            }
             throw new AppException("Invalid OTP", HttpStatus.BAD_REQUEST);
         }
 
+        otpFailures.remove(otp.getId());
         otp.setUsed(true);
         otpTokenRepository.save(otp);
 
@@ -179,10 +217,23 @@ public class AuthUserService {
 
     @Transactional
     public AuthResponse refresh(String rawRefreshToken) {
-        io.jsonwebtoken.Claims claims = jwtService.validateToken(rawRefreshToken);
+        io.jsonwebtoken.Claims claims;
+        try {
+            claims = jwtService.validateToken(rawRefreshToken);
+        } catch (Exception e) {
+            throw new AppException("Invalid or expired refresh token", HttpStatus.UNAUTHORIZED);
+        }
+        // Only genuine refresh tokens (not access tokens) that were issued by us and not revoked by logout
+        if (!"refresh".equals(claims.get("typ", String.class))
+                || refreshTokenRepository.findByTokenHashAndIsRevokedFalse(JwtService.hash(rawRefreshToken)).isEmpty()) {
+            throw new AppException("Invalid or expired refresh token", HttpStatus.UNAUTHORIZED);
+        }
         String uuid = claims.getSubject();
         AuthUser user = userRepository.findByUuid(uuid)
                 .orElseThrow(() -> new AppException("Invalid refresh token", HttpStatus.UNAUTHORIZED));
+        if ("SUSPENDED".equals(user.getStatus()) || "INACTIVE".equals(user.getStatus())) {
+            throw new AppException("Account " + user.getStatus().toLowerCase(), HttpStatus.UNAUTHORIZED);
+        }
         return buildAuthResponse(user);
     }
 
@@ -237,7 +288,7 @@ public class AuthUserService {
 
         RefreshToken rtEntity = new RefreshToken();
         rtEntity.setUserId(user.getId());
-        rtEntity.setTokenHash(java.util.UUID.randomUUID().toString());
+        rtEntity.setTokenHash(JwtService.hash(refreshToken));
         rtEntity.setExpiresAt(LocalDateTime.now().plusDays(30));
         rtEntity.setRevoked(false);
         refreshTokenRepository.save(rtEntity);
