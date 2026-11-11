@@ -107,6 +107,8 @@ public class PaymentService {
 
     // ─── Razorpay Order ───────────────────────────────────────────
 
+    private static final long RAZORPAY_TIMEOUT_SECONDS = 10;
+
     @Transactional
     public PaymentRazorpayOrder initiateRazorpayPayment(Long authUserId, Long dueId) {
         HostellerProfile profile = profileRepo.findByAuthUserId(authUserId)
@@ -124,13 +126,24 @@ public class PaymentService {
 
         String razorpayOrderId;
         try {
-            com.razorpay.RazorpayClient client = new com.razorpay.RazorpayClient(razorpayKeyId, razorpayKeySecret);
-            org.json.JSONObject params = new org.json.JSONObject();
-            params.put("amount", amountPaise);
-            params.put("currency", "INR");
-            params.put("receipt", "HOST-" + dueId);
-            com.razorpay.Order order = client.orders.create(params);
-            razorpayOrderId = order.get("id");
+            // Bounded wait: if the gateway is unreachable or hangs, the resident gets an answer instead of a spinner
+            razorpayOrderId = java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+                try {
+                    com.razorpay.RazorpayClient client = new com.razorpay.RazorpayClient(razorpayKeyId, razorpayKeySecret);
+                    org.json.JSONObject params = new org.json.JSONObject();
+                    params.put("amount", amountPaise);
+                    params.put("currency", "INR");
+                    params.put("receipt", "HOST-" + dueId);
+                    com.razorpay.Order order = client.orders.create(params);
+                    return order.<String>get("id");
+                } catch (Exception e) {
+                    throw new java.util.concurrent.CompletionException(e);
+                }
+            }).get(RAZORPAY_TIMEOUT_SECONDS, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new AppException("Online payment is temporarily unavailable. Please pay at the hostel reception.",
+                    HttpStatus.SERVICE_UNAVAILABLE);
         } catch (Exception e) {
             // e.g. gateway keys not configured / Razorpay unreachable — tell the resident what to do instead
             throw new AppException("Online payment is temporarily unavailable. Please pay at the hostel reception.",
