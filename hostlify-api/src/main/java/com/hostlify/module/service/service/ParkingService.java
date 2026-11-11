@@ -44,7 +44,10 @@ public class ParkingService {
     }
 
     public List<ParkingRecord> getMyParking(Long hostellerId) {
-        return parkingRepo.findByHostellerIdOrderByRegisteredAtDesc(hostellerId);
+        // Deregistered vehicles are history, not the resident's current vehicles
+        return parkingRepo.findByHostellerIdOrderByRegisteredAtDesc(hostellerId).stream()
+                .filter(r -> !"REMOVED".equals(r.getStatus()))
+                .toList();
     }
 
     @Transactional

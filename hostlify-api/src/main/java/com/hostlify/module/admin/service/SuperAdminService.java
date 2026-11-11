@@ -228,8 +228,32 @@ public class SuperAdminService {
     }
 
     /** Owners page with per-owner stats (hostels, active members, lifetime collections). */
-    public Page<Map<String, Object>> getOwnerViews(Pageable pageable) {
-        return ownerRepo.findAll(pageable).map(this::toOwnerView);
+    public Map<String, Object> getOwnerViews(Pageable pageable, String search, String status) {
+        // Filter across ALL owners before paging, so search finds owners on any page
+        String q = search != null ? search.trim().toLowerCase() : "";
+        String st = status != null && !status.isBlank() && !"ALL".equalsIgnoreCase(status) ? status.trim().toUpperCase() : null;
+        List<HostelOwner> all = ownerRepo.findAll(org.springframework.data.domain.Sort.by("id"));
+        List<HostelOwner> matched = all.stream()
+                .filter(o -> st == null || st.equals(o.getStatus()))
+                .filter(o -> q.isEmpty() || java.util.stream.Stream.of(o.getOwnerName(), o.getBusinessName(), o.getEmail(), o.getMobile())
+                        .anyMatch(v -> v != null && v.toLowerCase().contains(q)))
+                .toList();
+        int from = (int) Math.min(pageable.getOffset(), matched.size());
+        int to = Math.min(from + pageable.getPageSize(), matched.size());
+        Page<Map<String, Object>> page = new org.springframework.data.domain.PageImpl<>(
+                matched.subList(from, to).stream().map(this::toOwnerView).toList(), pageable, matched.size());
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("content", page.getContent());
+        out.put("totalElements", page.getTotalElements());
+        out.put("totalPages", page.getTotalPages());
+        out.put("number", page.getNumber());
+        out.put("size", page.getSize());
+        // Platform-wide counts for the stat cards (independent of the current page/filter)
+        out.put("totalOwners", all.size());
+        out.put("activeCount", all.stream().filter(o -> "ACTIVE".equals(o.getStatus())).count());
+        out.put("suspendedCount", all.stream().filter(o -> "SUSPENDED".equals(o.getStatus())).count());
+        return out;
     }
 
     public Map<String, Object> getOwnerView(Long id) {

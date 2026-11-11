@@ -52,6 +52,23 @@ public class HostelDiscoveryService {
         List<Map<String, Object>> result = new ArrayList<>();
         for (Hostel h : hostels) {
             if (city != null && !h.getCity().toLowerCase().contains(city.toLowerCase())) continue;
+            if (locality != null && !locality.isBlank()) {
+                String place = ((h.getAddress() != null ? h.getAddress() : "") + " "
+                        + (h.getLandmark() != null ? h.getLandmark() : "")).toLowerCase();
+                if (!place.contains(locality.trim().toLowerCase())) continue;
+            }
+            List<HostelPricing> pricing = pricingRepo.findByHostelIdAndIsActiveTrue(h.getId());
+            if (roomType != null && !roomType.isBlank()
+                    && pricing.stream().noneMatch(p -> p.getRoomType().equalsIgnoreCase(roomType))) continue;
+            if (maxRent != null) {
+                // Cheapest bed that matches the requested room type (or any type) must fit the budget
+                BigDecimal cheapest = pricing.stream()
+                        .filter(p -> roomType == null || roomType.isBlank() || p.getRoomType().equalsIgnoreCase(roomType))
+                        .map(HostelPricing::getBaseRent)
+                        .min(BigDecimal::compareTo)
+                        .orElse(h.getDefaultRent());
+                if (cheapest == null || cheapest.compareTo(maxRent) > 0) continue;
+            }
             result.add(buildHostelSummary(h, null));
         }
         return result;

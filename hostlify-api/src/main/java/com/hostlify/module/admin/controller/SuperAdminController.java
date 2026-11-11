@@ -128,11 +128,14 @@ public class SuperAdminController {
 
     @GetMapping("/owners")
     @Operation(summary = "SuperAdmin: list all hostel owners with hostel/member/revenue stats (paginated)")
-    public ApiResponse<Page<Map<String, Object>>> getOwners(
+    public ApiResponse<Map<String, Object>> getOwners(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String status) {
         requireSuperAdmin();
-        return ApiResponse.ok(adminService.getOwnerViews(PageRequest.of(page, size)));
+        int safeSize = Math.max(1, Math.min(size, 100));
+        return ApiResponse.ok(adminService.getOwnerViews(PageRequest.of(Math.max(page, 0), safeSize), search, status));
     }
 
     @GetMapping("/owners/{id}")

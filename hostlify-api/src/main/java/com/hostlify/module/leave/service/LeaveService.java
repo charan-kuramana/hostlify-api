@@ -18,13 +18,16 @@ public class LeaveService {
     private final LeaveRequestRepository leaveRepo;
     private final HostellerProfileRepository profileRepo;
     private final BookingCheckinRepository bookingRepo;
+    private final com.hostlify.module.hostel.repository.RoomRepository roomRepo;
 
     public LeaveService(LeaveRequestRepository leaveRepo,
                         HostellerProfileRepository profileRepo,
-                        BookingCheckinRepository bookingRepo) {
+                        BookingCheckinRepository bookingRepo,
+                        com.hostlify.module.hostel.repository.RoomRepository roomRepo) {
         this.leaveRepo = leaveRepo;
         this.profileRepo = profileRepo;
         this.bookingRepo = bookingRepo;
+        this.roomRepo = roomRepo;
     }
 
     public List<LeaveRequest> getByHosteller(Long hostellerId) {
@@ -103,10 +106,19 @@ public class LeaveService {
         profileRepo.findByHostelId(hostelId).forEach(p ->
                 names.put(p.getId(), (p.getFirstName() + " " + (p.getLastName() != null ? p.getLastName() : "")).trim()));
         List<LeaveRequest> out = new java.util.ArrayList<>();
+        java.util.Map<Long, String> roomByBooking = new java.util.HashMap<>();
         for (Long hostellerId : names.keySet()) {
             for (LeaveRequest l : leaveRepo.findByHostellerIdOrderByCreatedAtDesc(hostellerId)) {
                 if (pendingOnly && !"PENDING".equals(l.getStatus())) continue;
                 l.setHostellerName(names.get(hostellerId));
+                // Room of the stay the leave belongs to (staff list shows it)
+                if (l.getBookingId() != null) {
+                    l.setRoomNumber(roomByBooking.computeIfAbsent(l.getBookingId(), bid ->
+                            bookingRepo.findById(bid)
+                                    .flatMap(b -> roomRepo.findById(b.getRoomId()))
+                                    .map(r -> r.getRoomName())
+                                    .orElse(null)));
+                }
                 out.add(l);
             }
         }
