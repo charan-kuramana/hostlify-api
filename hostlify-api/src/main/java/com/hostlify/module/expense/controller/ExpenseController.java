@@ -134,8 +134,8 @@ public class ExpenseController {
         if (employee.getHostelId() == null)
             throw new com.hostlify.shared.exception.AppException("hostelId is required", org.springframework.http.HttpStatus.BAD_REQUEST);
         HostelAccess.requireStaffHostel(employee.getHostelId());
-        if (employee.getBaseSalary().signum() < 0)
-            throw new com.hostlify.shared.exception.AppException("Salary cannot be negative", org.springframework.http.HttpStatus.BAD_REQUEST);
+        if (employee.getBaseSalary().signum() <= 0)
+            throw new com.hostlify.shared.exception.AppException("Salary must be greater than 0", org.springframework.http.HttpStatus.BAD_REQUEST);
         if (employee.getName() == null || employee.getName().isBlank())
             throw new com.hostlify.shared.exception.AppException("employeeName is required", org.springframework.http.HttpStatus.BAD_REQUEST);
         if (employee.getRole() == null || employee.getRole().isBlank())
@@ -185,6 +185,12 @@ public class ExpenseController {
         BigDecimal gross = rawGross != null ? new BigDecimal(rawGross.toString()) : BigDecimal.ZERO;
         BigDecimal deductions = body.get("deductions") != null ?
                 new BigDecimal(body.get("deductions").toString()) : BigDecimal.ZERO;
+        if (month < 1 || month > 12)
+            throw new com.hostlify.shared.exception.AppException("Month must be between 1 and 12", org.springframework.http.HttpStatus.BAD_REQUEST);
+        if (gross.signum() <= 0)
+            throw new com.hostlify.shared.exception.AppException("Salary amount must be greater than 0", org.springframework.http.HttpStatus.BAD_REQUEST);
+        if (deductions.signum() < 0 || deductions.compareTo(gross) > 0)
+            throw new com.hostlify.shared.exception.AppException("Deductions must be between 0 and the salary amount", org.springframework.http.HttpStatus.BAD_REQUEST);
         return ApiResponse.ok(expenseService.recordSalary(employeeId, month, year, gross, deductions));
     }
 

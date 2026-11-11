@@ -120,7 +120,15 @@ public class BookingRequestController {
                                                       @RequestBody Map<String, Object> body) {
         UserPrincipal p = getPrincipal();
         requireRequestAccess(id);
-        String reason = (String) body.get("reason");
+        String reason = body != null && body.get("reason") != null ? body.get("reason").toString().trim() : "";
+        if (reason.isEmpty()) {
+            throw new com.hostlify.shared.exception.AppException("A reason is required to reject a booking request",
+                    org.springframework.http.HttpStatus.BAD_REQUEST);
+        }
+        if (reason.length() > 500) {
+            throw new com.hostlify.shared.exception.AppException("Reason must be 500 characters or fewer",
+                    org.springframework.http.HttpStatus.BAD_REQUEST);
+        }
         return ApiResponse.ok(requestService.rejectRequest(id, p.getUserId(), reason), "Request rejected");
     }
 

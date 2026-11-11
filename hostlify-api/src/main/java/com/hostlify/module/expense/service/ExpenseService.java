@@ -164,10 +164,20 @@ public class ExpenseService {
     @Transactional
     public ExpenseEmployee updateEmployee(Long id, ExpenseEmployee req) {
         ExpenseEmployee emp = getEmployee(id);
-        emp.setName(req.getName());
-        emp.setRole(req.getRole());
-        emp.setMobile(req.getMobile());
-        emp.setBaseSalary(req.getBaseSalary());
+        // Partial update: fields left out of the request keep their current values
+        if (req.getName() != null) {
+            if (req.getName().isBlank()) throw new AppException("Employee name cannot be empty", HttpStatus.BAD_REQUEST);
+            emp.setName(req.getName().trim());
+        }
+        if (req.getRole() != null) {
+            if (req.getRole().isBlank()) throw new AppException("Designation cannot be empty", HttpStatus.BAD_REQUEST);
+            emp.setRole(req.getRole().trim());
+        }
+        if (req.getMobile() != null) emp.setMobile(req.getMobile());
+        if (req.getBaseSalary() != null) {
+            if (req.getBaseSalary().signum() <= 0) throw new AppException("Salary must be greater than 0", HttpStatus.BAD_REQUEST);
+            emp.setBaseSalary(req.getBaseSalary());
+        }
         return employeeRepo.save(emp);
     }
 
@@ -184,14 +194,17 @@ public class ExpenseService {
     @Transactional
     public ExpenseSalaryRecord recordSalary(Long employeeId, int month, int year,
                                             BigDecimal grossSalary, BigDecimal deductions) {
-        if (salaryRepo.findByEmployeeIdAndPeriodYearAndPeriodMonth(employeeId, year, month).isPresent()) {
-            throw new AppException("Salary already recorded for this employee for " + month + "/" + year,
+        // A PENDING record for the month (e.g. from payroll setup) is paid in place; only a PAID one is a duplicate.
+        ExpenseSalaryRecord record = salaryRepo.findByEmployeeIdAndPeriodYearAndPeriodMonth(employeeId, year, month)
+                .orElse(null);
+        if (record != null && "PAID".equals(record.getStatus())) {
+            throw new AppException("Salary already paid for this employee for " + month + "/" + year,
                     HttpStatus.CONFLICT);
         }
         ExpenseEmployee emp = getEmployee(employeeId);
         BigDecimal net = grossSalary.subtract(deductions != null ? deductions : BigDecimal.ZERO);
 
-        ExpenseSalaryRecord record = new ExpenseSalaryRecord();
+        if (record == null) record = new ExpenseSalaryRecord();
         record.setEmployeeId(employeeId);
         record.setHostelId(emp.getHostelId());
         record.setPeriodMonth(month);
@@ -200,6 +213,7 @@ public class ExpenseService {
         record.setDeductions(deductions != null ? deductions : BigDecimal.ZERO);
         record.setNetSalary(net);
         record.setStatus("PAID");
+        record.setPaidAt(java.time.LocalDateTime.now());
         return salaryRepo.save(record);
     }
 

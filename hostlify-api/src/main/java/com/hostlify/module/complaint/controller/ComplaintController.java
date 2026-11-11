@@ -123,7 +123,20 @@ public class ComplaintController {
         if (!java.util.List.of("OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED").contains(status)) {
             throw new com.hostlify.shared.exception.AppException("Invalid status: " + status, org.springframework.http.HttpStatus.BAD_REQUEST);
         }
+        requireResolutionNotes(status, resolution);
         return ApiResponse.ok(complaintService.updateComplaintStatus(id, status, resolvedBy, resolution));
+    }
+
+    /** Residents see the resolution notes, so resolving or closing a complaint needs one. */
+    private void requireResolutionNotes(String status, String resolution) {
+        if (("RESOLVED".equals(status) || "CLOSED".equals(status)) && (resolution == null || resolution.isBlank())) {
+            throw new com.hostlify.shared.exception.AppException("Resolution notes are required to resolve a complaint",
+                    org.springframework.http.HttpStatus.BAD_REQUEST);
+        }
+        if (resolution != null && resolution.length() > 2000) {
+            throw new com.hostlify.shared.exception.AppException("Resolution notes must be 2000 characters or fewer",
+                    org.springframework.http.HttpStatus.BAD_REQUEST);
+        }
     }
 
     @PatchMapping("/{id}/status")
@@ -137,6 +150,7 @@ public class ComplaintController {
         if (!java.util.List.of("OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED").contains(status)) {
             throw new com.hostlify.shared.exception.AppException("Invalid status: " + status, org.springframework.http.HttpStatus.BAD_REQUEST);
         }
+        requireResolutionNotes(status, resolution);
         return ApiResponse.ok(complaintService.updateComplaintStatus(id, status, resolvedBy, resolution));
     }
 
