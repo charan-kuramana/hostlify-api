@@ -57,4 +57,8 @@ public class AuthUser extends BaseEntity {
 
     @Column(name = "totp_secret", length = 100)
     private String totpSecret;
+
+    /** Access tokens issued before this moment are rejected (set on logout and password reset). */
+    @Column(name = "sessions_revoked_at")
+    private LocalDateTime sessionsRevokedAt;
 }

@@ -212,7 +212,9 @@ public class AuthUserService {
         user.setPasswordHash(passwordEncoder.encode(newPassword));
         user.setLockedUntil(null);
         user.setFailedAttempts(0);
+        user.setSessionsRevokedAt(LocalDateTime.now()); // sign out every existing session
         userRepository.save(user);
+        refreshTokenRepository.revokeAllByUserId(user.getId());
     }
 
     @Transactional
@@ -242,9 +244,12 @@ public class AuthUserService {
         try {
             io.jsonwebtoken.Claims claims = jwtService.validateToken(rawRefreshToken);
             String uuid = claims.getSubject();
-            userRepository.findByUuid(uuid).ifPresent(user ->
-                refreshTokenRepository.revokeAllByUserId(user.getId())
-            );
+            userRepository.findByUuid(uuid).ifPresent(user -> {
+                refreshTokenRepository.revokeAllByUserId(user.getId());
+                // Also kill access tokens already handed out (checked in JwtFilter)
+                user.setSessionsRevokedAt(LocalDateTime.now());
+                userRepository.save(user);
+            });
         } catch (Exception ignored) {
             // If token is already invalid, logout is a no-op
         }

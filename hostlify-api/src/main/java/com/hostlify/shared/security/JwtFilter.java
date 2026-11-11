@@ -66,10 +66,20 @@ public class JwtFilter extends OncePerRequestFilter {
                 throw new IllegalStateException("refresh token used as access token");
             }
             // A suspended / deactivated / deleted account loses access immediately, not when its token expires
-            String currentStatus = authUserRepository.findByUuid(claims.getSubject())
-                    .map(com.hostlify.module.auth.entity.AuthUser::getStatus).orElse(null);
+            com.hostlify.module.auth.entity.AuthUser account = authUserRepository.findByUuid(claims.getSubject()).orElse(null);
+            String currentStatus = account != null ? account.getStatus() : null;
             if (currentStatus == null || "SUSPENDED".equals(currentStatus) || "INACTIVE".equals(currentStatus)) {
                 throw new IllegalStateException("account not active");
+            }
+            // Logged out (or password reset) after this token was issued -> the token is dead.
+            // JWT "iat" has whole-second precision, so compare at second precision.
+            if (account.getSessionsRevokedAt() != null && claims.getIssuedAt() != null) {
+                java.time.Instant revokedAt = account.getSessionsRevokedAt()
+                        .atZone(java.time.ZoneId.systemDefault()).toInstant()
+                        .truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
+                if (claims.getIssuedAt().toInstant().isBefore(revokedAt)) {
+                    throw new IllegalStateException("session revoked");
+                }
             }
             if (SecurityContextHolder.getContext().getAuthentication() == null) {
                 String role = claims.get("role", String.class);
