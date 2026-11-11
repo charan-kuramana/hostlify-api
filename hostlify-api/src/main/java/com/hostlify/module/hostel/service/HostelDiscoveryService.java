@@ -115,7 +115,11 @@ public class HostelDiscoveryService {
         } else {
             m.put("minRent", h.getDefaultRent());
         }
-        m.put("amenities", amenityRepo.findByHostelId(h.getId()));
+        // Discovery cards render amenities as plain labels (string[])
+        m.put("amenities", amenityRepo.findByHostelId(h.getId()).stream()
+                .filter(HostelAmenity::isEnabled)
+                .map(HostelAmenity::getLabel)
+                .toList());
         return m;
     }
 
