@@ -32,6 +32,7 @@ public class CleaningController {
     @Operation(summary = "Staff: list all cleaning requests for a hostel")
     public ApiResponse<List<CleaningRequest>> getByHostel(@PathVariable Long hostelId,
                                                             @RequestParam(required = false) String status) {
+        com.hostlify.shared.security.HostelAccess.requireStaffHostel(hostelId);
         if (status != null) {
             return ApiResponse.ok(cleaningService.getByHostelAndStatus(hostelId, status));
         }
@@ -51,11 +52,32 @@ public class CleaningController {
     @Operation(summary = "Hosteller: submit a cleaning request")
     public ApiResponse<CleaningRequest> submit(@RequestBody Map<String, Object> body) {
         UserPrincipal p = getPrincipal();
-        String roomNumber = (String) body.getOrDefault("roomNumber", null);
         String notes = (String) body.getOrDefault("notes", null);
+        if (notes != null && notes.length() > 500) {
+            throw new AppException("Notes must be 500 characters or less", HttpStatus.BAD_REQUEST);
+        }
+        java.time.LocalDate preferredDate = null;
+        Object pd = body.get("preferredDate");
+        if (pd != null && !pd.toString().isBlank()) {
+            try {
+                preferredDate = java.time.LocalDate.parse(pd.toString());
+            } catch (java.time.format.DateTimeParseException e) {
+                throw new AppException("Invalid preferred date", HttpStatus.BAD_REQUEST);
+            }
+        }
+        // roomNumber is resolved from the hosteller's active booking, not taken from the body
         return ApiResponse.ok(
-                cleaningService.submitRequest(p.getHostellerProfileId(), p.getHostelId(), roomNumber, notes),
+                cleaningService.submitRequest(p.getHostellerProfileId(), p.getHostelId(), preferredDate, notes),
                 "Cleaning request submitted");
+    }
+
+    @PatchMapping("/{requestId}/cancel")
+    @PreAuthorize("hasRole('HOSTELLER')")
+    @Operation(summary = "Hosteller: cancel my own PENDING cleaning request")
+    public ApiResponse<CleaningRequest> cancel(@PathVariable Long requestId) {
+        UserPrincipal p = getPrincipal();
+        return ApiResponse.ok(cleaningService.cancelByHosteller(requestId, p.getHostellerProfileId()),
+                "Cleaning request cancelled");
     }
 
     @PatchMapping("/{requestId}/status")
@@ -65,6 +87,11 @@ public class CleaningController {
                                                       @RequestBody Map<String, Object> body) {
         UserPrincipal p = getPrincipal();
         String status = (String) body.get("status");
+        Long hostelId = cleaningService.hostelIdOfRequest(requestId);
+        com.hostlify.shared.security.HostelAccess.requireStaffHostel(hostelId);
+        if (!java.util.List.of("PENDING", "SCHEDULED", "IN_PROGRESS", "COMPLETED", "CANCELLED").contains(status)) {
+            throw new AppException("Invalid status: " + status, HttpStatus.BAD_REQUEST);
+        }
         return ApiResponse.ok(cleaningService.updateStatus(requestId, status, p.getUserId()), "Status updated");
     }
 

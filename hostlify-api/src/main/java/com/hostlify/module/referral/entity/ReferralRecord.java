@@ -36,4 +36,8 @@ public class ReferralRecord extends BaseEntity {
 
     @Column(name = "discount_amount", nullable = false, precision = 12, scale = 2)
     private BigDecimal discountAmount = BigDecimal.ZERO;
+
+    /** Display name of the referred hosteller (populated for the referrer's list). */
+    @Transient
+    private String referredName;
 }

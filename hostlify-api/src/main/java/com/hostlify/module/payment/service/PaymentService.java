@@ -79,13 +79,13 @@ public class PaymentService {
     }
 
     public List<PaymentDue> getPendingDuesByHostel(Long hostelId) {
-        List<PaymentDue> dues = dueRepo.findByHostelIdAndStatus(hostelId, "UNPAID");
-        dues.forEach(due -> {
-            profileRepo.findById(due.getHostellerId()).ifPresent(p ->
-                    due.setHostellerName(p.getFirstName() + " " + (p.getLastName() != null ? p.getLastName() : "").trim()));
-            bookingRepo.findById(due.getBookingId()).ifPresent(b ->
-                    roomRepo.findById(b.getRoomId()).ifPresent(r -> due.setRoomNumber(r.getRoomName())));
-        });
+        // Anything not fully paid: a PARTIAL due used to vanish from the staff list, leaving no way to
+        // collect the balance. enrichDue also tolerates a null bookingId (findById(null) threw → 500).
+        List<PaymentDue> dues = new java.util.ArrayList<>();
+        for (String st : List.of("UNPAID", "PARTIAL", "OVERDUE")) dues.addAll(dueRepo.findByHostelIdAndStatus(hostelId, st));
+        dues.sort(java.util.Comparator.comparing(PaymentDue::getDueDate,
+                java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder())));
+        dues.forEach(this::enrichDue);
         return dues;
     }
 
@@ -112,6 +112,9 @@ public class PaymentService {
         HostellerProfile profile = profileRepo.findByAuthUserId(authUserId)
                 .orElseThrow(() -> new AppException("Profile not found", HttpStatus.NOT_FOUND));
         PaymentDue due = getDue(dueId);
+        if (!java.util.Objects.equals(due.getHostellerId(), profile.getId())) {
+            throw new AppException("Access denied", HttpStatus.FORBIDDEN);
+        }
 
         if ("PAID".equals(due.getStatus())) {
             throw new AppException("Due is already paid", HttpStatus.CONFLICT);
@@ -129,7 +132,9 @@ public class PaymentService {
             com.razorpay.Order order = client.orders.create(params);
             razorpayOrderId = order.get("id");
         } catch (Exception e) {
-            throw new AppException("Failed to create Razorpay order: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+            // e.g. gateway keys not configured / Razorpay unreachable — tell the resident what to do instead
+            throw new AppException("Online payment is temporarily unavailable. Please pay at the hostel reception.",
+                    HttpStatus.SERVICE_UNAVAILABLE);
         }
 
         PaymentRazorpayOrder order = new PaymentRazorpayOrder();
@@ -198,7 +203,15 @@ public class PaymentService {
         return dues;
     }
 
+    private BigDecimal paidSoFar(Long dueId) {
+        return recordRepo.findByDueId(dueId).stream()
+                .filter(r -> r.getStatus() == null || "SUCCESS".equals(r.getStatus()))
+                .map(PaymentRecord::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
     private void enrichDue(PaymentDue due) {
+        due.setPaidAmount(paidSoFar(due.getId()));
         profileRepo.findById(due.getHostellerId()).ifPresent(p ->
                 due.setHostellerName((p.getFirstName() + " " + (p.getLastName() != null ? p.getLastName() : "")).trim()));
         if (due.getBookingId() != null) {
@@ -242,6 +255,20 @@ public class PaymentService {
         PaymentDue due = getDue(dueId);
         HostellerProfile profile = profileRepo.findById(hostellerId)
                 .orElseThrow(() -> new AppException("Hosteller not found", HttpStatus.NOT_FOUND));
+        if (!hostellerId.equals(due.getHostellerId())) {
+            throw new AppException("This due belongs to a different hosteller", HttpStatus.BAD_REQUEST);
+        }
+        if ("PAID".equals(due.getStatus())) {
+            throw new AppException("This due is already paid", HttpStatus.CONFLICT);
+        }
+        if (amount == null || amount.signum() <= 0) {
+            throw new AppException("Amount must be greater than 0", HttpStatus.BAD_REQUEST);
+        }
+        BigDecimal alreadyPaid = paidSoFar(dueId);
+        BigDecimal outstanding = due.getRentAmount().subtract(alreadyPaid);
+        if (amount.compareTo(outstanding) > 0) {
+            throw new AppException("Amount exceeds the outstanding balance of " + outstanding, HttpStatus.BAD_REQUEST);
+        }
 
         PaymentRecord record = new PaymentRecord();
         record.setHostellerId(hostellerId);
@@ -256,8 +283,8 @@ public class PaymentService {
         record.setStatus("SUCCESS");
         PaymentRecord saved = recordRepo.save(record);
 
-        // Update due status
-        if (amount.compareTo(due.getRentAmount()) >= 0) {
+        // Update due status (cumulative: two partial payments that add up to the rent settle the due)
+        if (alreadyPaid.add(amount).compareTo(due.getRentAmount()) >= 0) {
             due.setStatus("PAID");
         } else {
             due.setStatus("PARTIAL");

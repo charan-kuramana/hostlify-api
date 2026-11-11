@@ -60,4 +60,8 @@ public class PaymentDue extends BaseEntity {
 
     @Transient
     private String roomNumber;
+
+    /** Sum of successful payments recorded against this due (staff views; partial payments). */
+    @Transient
+    private BigDecimal paidAmount;
 }

@@ -71,7 +71,13 @@ public class ComplaintService {
         // If hostelId not provided, look up from active booking
         if (complaint.getHostelId() == null && complaint.getHostellerId() != null) {
             bookingRepo.findFirstByHostellerIdAndStatus(complaint.getHostellerId(), "ACTIVE")
-                    .ifPresent(b -> complaint.setHostelId(b.getHostelId()));
+                    .ifPresent(b -> {
+                        complaint.setHostelId(b.getHostelId());
+                        if (complaint.getRoomId() == null) complaint.setRoomId(b.getRoomId());
+                    });
+        }
+        if (complaint.getHostelId() == null || complaint.getHostellerId() == null) {
+            throw new AppException("You need an active stay to raise a complaint", HttpStatus.BAD_REQUEST);
         }
         return complaintRepo.save(complaint);
     }

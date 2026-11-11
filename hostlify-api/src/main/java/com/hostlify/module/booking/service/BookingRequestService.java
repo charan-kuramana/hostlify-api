@@ -57,11 +57,26 @@ public class BookingRequestService {
     @Transactional(isolation = Isolation.SERIALIZABLE)
     public BookingRequest createRequest(Long userId, Long profileId, Long hostelId,
                                          Long bedId, LocalDate checkInDate, String notes) {
+        // A resident with an ACTIVE booking can't request a second bed
+        if (profileId != null && checkinRepo.findFirstByHostellerIdAndStatus(profileId, "ACTIVE").isPresent()) {
+            throw new AppException("You already have an active stay. Contact your hostel to change beds.", HttpStatus.CONFLICT);
+        }
+        if (checkInDate.isBefore(LocalDate.now())) {
+            throw new AppException("Check-in date cannot be in the past", HttpStatus.BAD_REQUEST);
+        }
+        if (checkInDate.isAfter(LocalDate.now().plusDays(90))) {
+            throw new AppException("Check-in date must be within the next 90 days", HttpStatus.BAD_REQUEST);
+        }
+        if (notes != null && notes.length() > 1000) {
+            throw new AppException("Preference notes must be 1000 characters or less", HttpStatus.BAD_REQUEST);
+        }
+
         // BR-02: cancel any existing pending request
         requestRepo.findFirstByHostellerUserIdAndStatusIn(userId,
                 Arrays.asList("PENDING_APPROVAL", "REASSIGNED"))
                 .ifPresent(existing -> {
-                    bedRepo.findById(existing.getBedId()).ifPresent(b -> {
+                    // release the bed actually held (the reassigned one, if staff moved the request)
+                    bedRepo.findById(existing.getReassignedBedId() != null ? existing.getReassignedBedId() : existing.getBedId()).ifPresent(b -> {
                         b.setStatus("AVAILABLE");
                         bedRepo.save(b);
                     });
@@ -72,6 +87,9 @@ public class BookingRequestService {
         // BR-01: check bed is AVAILABLE
         Bed bed = bedRepo.findByIdForUpdate(bedId)
                 .orElseThrow(() -> new AppException("Bed not found", HttpStatus.NOT_FOUND));
+        if (!java.util.Objects.equals(bed.getHostelId(), hostelId)) {
+            throw new AppException("Bed does not belong to this hostel", HttpStatus.BAD_REQUEST);
+        }
         if (!"AVAILABLE".equals(bed.getStatus())) {
             throw new AppException("Bed is not available (status: " + bed.getStatus() + ")", HttpStatus.CONFLICT);
         }
@@ -140,7 +158,18 @@ public class BookingRequestService {
             m.put("expiresAt", r.getExpiresAt());
             m.put("preferenceNotes", r.getPreferenceNotes());
             m.put("rejectionReason", r.getRejectionReason());
+            m.put("createdAt", r.getCreatedAt());
             m.put("detailsLocked", !approved);
+            if (r.getReassignedBedId() != null) {
+                m.put("reassignedBedId", r.getReassignedBedId());
+                bedRepo.findById(r.getReassignedBedId()).ifPresent(b -> {
+                    m.put("reassignedBedName", b.getBedName());
+                    roomRepo.findById(b.getRoomId()).ifPresent(rm -> {
+                        m.put("reassignedRoomName", rm.getRoomName());
+                        floorRepo.findById(rm.getFloorId()).ifPresent(f -> m.put("reassignedFloorName", f.getFloorName()));
+                    });
+                });
+            }
             // Resolve unit names (not personal data)
             bedRepo.findById(r.getBedId()).ifPresent(b -> m.put("bedName", b.getBedName()));
             roomRepo.findById(r.getRoomId()).ifPresent(rm -> m.put("roomName", rm.getRoomName()));
@@ -174,7 +203,9 @@ public class BookingRequestService {
         if (!"PENDING_APPROVAL".equals(req.getStatus()) && !"REASSIGNED".equals(req.getStatus())) {
             throw new AppException("Cannot cancel request in status: " + req.getStatus(), HttpStatus.CONFLICT);
         }
-        bedRepo.findById(req.getBedId()).ifPresent(b -> {
+        // After a reassign the original bed is already free and the new one is RESERVED — release that one
+        Long bedToRelease = req.getReassignedBedId() != null ? req.getReassignedBedId() : req.getBedId();
+        bedRepo.findById(bedToRelease).ifPresent(b -> {
             b.setStatus("AVAILABLE");
             bedRepo.save(b);
         });
@@ -225,6 +256,10 @@ public class BookingRequestService {
     public BookingRequest reassignBed(Long requestId, Long staffId, Long newBedId) {
         BookingRequest req = requestRepo.findById(requestId)
                 .orElseThrow(() -> new AppException("Request not found", HttpStatus.NOT_FOUND));
+        // Only open requests can move: reassigning an APPROVED request used to free its OCCUPIED bed
+        if (!"PENDING_APPROVAL".equals(req.getStatus()) && !"REASSIGNED".equals(req.getStatus())) {
+            throw new AppException("Request cannot be reassigned in status: " + req.getStatus(), HttpStatus.CONFLICT);
+        }
         // Release old bed
         Long oldBedId = req.getReassignedBedId() != null ? req.getReassignedBedId() : req.getBedId();
         bedRepo.findById(oldBedId).ifPresent(b -> {

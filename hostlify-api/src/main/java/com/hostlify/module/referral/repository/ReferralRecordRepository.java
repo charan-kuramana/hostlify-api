@@ -9,4 +9,6 @@ import java.util.List;
 @Repository
 public interface ReferralRecordRepository extends JpaRepository<ReferralRecord, Long> {
     List<ReferralRecord> findByReferrerId(Long referrerId);
+
+    boolean existsByReferredId(Long referredId);
 }

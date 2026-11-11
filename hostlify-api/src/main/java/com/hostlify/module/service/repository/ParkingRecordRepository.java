@@ -13,4 +13,9 @@ public interface ParkingRecordRepository extends JpaRepository<ParkingRecord, Lo
     List<ParkingRecord> findByHostellerIdOrderByRegisteredAtDesc(Long hostellerId);
     Optional<ParkingRecord> findByHostellerIdAndStatus(Long hostellerId, String status);
     Optional<ParkingRecord> findByVehicleNumber(String vehicleNumber);
+
+    /** ACTIVE registrations whose plate matches ignoring case, spaces and dashes. */
+    @org.springframework.data.jpa.repository.Query("select p from ParkingRecord p where p.status = 'ACTIVE' and "
+            + "upper(replace(replace(p.vehicleNumber, ' ', ''), '-', '')) = :canonical")
+    List<ParkingRecord> findActiveByCanonicalPlate(@org.springframework.data.repository.query.Param("canonical") String canonical);
 }

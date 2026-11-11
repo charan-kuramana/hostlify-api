@@ -50,25 +50,32 @@ public class ParkingService {
     @Transactional
     public ParkingRecord registerParking(Long hostellerId, Long hostelId,
                                           String vehicleNumber, String vehicleType, String slotNumber) {
-        // Ensure no duplicate active registration for the same vehicle
-        parkingRepo.findByVehicleNumber(vehicleNumber.toUpperCase()).ifPresent(existing -> {
-            if ("ACTIVE".equals(existing.getStatus())) {
-                throw new AppException("Vehicle " + vehicleNumber + " is already registered", HttpStatus.CONFLICT);
-            }
-        });
+        String plate = vehicleNumber.trim().toUpperCase().replaceAll("[\\s-]+", " ");
+        String canonical = plate.replace(" ", "");
+        if (canonical.length() < 4 || plate.length() > 20 || !canonical.matches("[A-Z0-9]+")) {
+            throw new AppException("Enter a valid vehicle number", HttpStatus.BAD_REQUEST);
+        }
+        if (vehicleType == null || vehicleType.isBlank() || vehicleType.length() > 20) {
+            throw new AppException("A valid vehicle type is required", HttpStatus.BAD_REQUEST);
+        }
+        // Ensure no duplicate active registration for the same vehicle. (findByVehicleNumber threw
+        // a 500 once a plate had been registered → removed → registered again, i.e. 2+ rows.)
+        if (!parkingRepo.findActiveByCanonicalPlate(canonical).isEmpty()) {
+            throw new AppException("Vehicle " + plate + " is already registered", HttpStatus.CONFLICT);
+        }
 
-        // Resolve hostelId from active booking if not provided in JWT
-        Long resolvedHostelId = hostelId;
+        // Resolve hostelId from the active booking (the JWT value can be stale or missing)
+        Long resolvedHostelId = bookingRepo.findFirstByHostellerIdAndStatus(hostellerId, "ACTIVE")
+                .map(b -> b.getHostelId())
+                .orElse(hostelId);
         if (resolvedHostelId == null) {
-            resolvedHostelId = bookingRepo.findFirstByHostellerIdAndStatus(hostellerId, "ACTIVE")
-                    .map(b -> b.getHostelId())
-                    .orElse(null);
+            throw new AppException("You need an active stay to register parking", HttpStatus.BAD_REQUEST);
         }
 
         ParkingRecord record = new ParkingRecord();
         record.setHostellerId(hostellerId);
         record.setHostelId(resolvedHostelId);
-        record.setVehicleNumber(vehicleNumber.toUpperCase());
+        record.setVehicleNumber(plate);
         record.setVehicleType(vehicleType);
         record.setSlotNumber(slotNumber);
         record.setStatus("ACTIVE");
@@ -78,8 +85,17 @@ public class ParkingService {
 
     @Transactional
     public ParkingRecord deregisterParking(Long recordId) {
+        return deregisterParking(recordId, null);
+    }
+
+    /** @param requesterHostellerId when non-null (hosteller caller), the record must be theirs. */
+    @Transactional
+    public ParkingRecord deregisterParking(Long recordId, Long requesterHostellerId) {
         ParkingRecord record = parkingRepo.findById(recordId)
                 .orElseThrow(() -> new AppException("Parking record not found", HttpStatus.NOT_FOUND));
+        if (requesterHostellerId != null && !requesterHostellerId.equals(record.getHostellerId())) {
+            throw new AppException("Access denied", HttpStatus.FORBIDDEN);
+        }
         record.setStatus("REMOVED");
         return parkingRepo.save(record);
     }

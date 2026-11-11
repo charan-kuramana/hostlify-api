@@ -21,9 +21,12 @@ import java.util.Map;
 public class ReviewController {
 
     private final ReviewService reviewService;
+    private final com.hostlify.module.review.repository.HostelReviewRepository reviewRepo;
 
-    public ReviewController(ReviewService reviewService) {
+    public ReviewController(ReviewService reviewService,
+                            com.hostlify.module.review.repository.HostelReviewRepository reviewRepo) {
         this.reviewService = reviewService;
+        this.reviewRepo = reviewRepo;
     }
 
     @GetMapping("/hostel/{hostelId}")
@@ -57,6 +60,9 @@ public class ReviewController {
     @Operation(summary = "Staff: toggle review visibility")
     public ApiResponse<HostelReview> toggleVisibility(@PathVariable Long reviewId,
                                                         @RequestParam boolean visible) {
+        HostelReview review = reviewRepo.findById(reviewId)
+                .orElseThrow(() -> new AppException("Review not found", HttpStatus.NOT_FOUND));
+        com.hostlify.shared.security.HostelAccess.requireStaffHostel(review.getHostelId());
         return ApiResponse.ok(reviewService.toggleVisibility(reviewId, visible),
                 "Review visibility updated");
     }

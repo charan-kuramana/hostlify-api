@@ -31,6 +31,15 @@ public class LeaveController {
     @GetMapping("/hosteller/{hostellerId}")
     @PreAuthorize("hasAnyRole('HOSTELLER','HOSTEL_STAFF')")
     public ApiResponse<List<LeaveRequest>> getByHosteller(@PathVariable Long hostellerId) {
+        UserPrincipal p = getPrincipal();
+        if (p != null && p.isHosteller() && !java.util.Objects.equals(p.getHostellerProfileId(), hostellerId)) {
+            throw new com.hostlify.shared.exception.AppException("Access denied", org.springframework.http.HttpStatus.FORBIDDEN);
+        }
+        if (p != null && p.isStaff()) {
+            // Staff: only leaves of residents in their own hostels
+            return ApiResponse.ok(leaveService.getByHosteller(hostellerId).stream()
+                    .filter(l -> p.getHostelIds() != null && p.getHostelIds().contains(leaveService.hostelIdOf(l))).toList());
+        }
         return ApiResponse.ok(leaveService.getByHosteller(hostellerId));
     }
 
@@ -44,8 +53,24 @@ public class LeaveController {
 
     @GetMapping("/pending")
     @PreAuthorize("hasRole('HOSTEL_STAFF')")
-    public ApiResponse<List<LeaveRequest>> getPending() {
-        return ApiResponse.ok(leaveService.getPending());
+    public ApiResponse<List<LeaveRequest>> getPending(@RequestParam(required = false) Long hostelId) {
+        // Was platform-wide: every hostel's staff saw (and could approve) every hostel's leaves
+        UserPrincipal p = getPrincipal();
+        if (hostelId != null) {
+            com.hostlify.shared.security.HostelAccess.requireStaffHostel(hostelId);
+            return ApiResponse.ok(leaveService.getForHostel(hostelId, true));
+        }
+        List<LeaveRequest> out = new java.util.ArrayList<>();
+        if (p != null && p.getHostelIds() != null) p.getHostelIds().forEach(h -> out.addAll(leaveService.getForHostel(h, true)));
+        return ApiResponse.ok(out);
+    }
+
+    /** Staff: all leave requests (pending + reviewed) for residents of a hostel */
+    @GetMapping("/hostel/{hostelId}")
+    @PreAuthorize("hasRole('HOSTEL_STAFF')")
+    public ApiResponse<List<LeaveRequest>> getForHostel(@PathVariable Long hostelId) {
+        com.hostlify.shared.security.HostelAccess.requireStaffHostel(hostelId);
+        return ApiResponse.ok(leaveService.getForHostel(hostelId, false));
     }
 
     @GetMapping("/occupancy")
@@ -53,6 +78,7 @@ public class LeaveController {
     public ApiResponse<Map<String, Object>> getOccupancy(@RequestParam Long hostelId,
                                                           @RequestParam String from,
                                                           @RequestParam String to) {
+        com.hostlify.shared.security.HostelAccess.requireStaffHostel(hostelId);
         return ApiResponse.ok(leaveService.getOccupancy(hostelId,
                 java.time.LocalDate.parse(from), java.time.LocalDate.parse(to)));
     }
@@ -60,7 +86,13 @@ public class LeaveController {
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('HOSTELLER','HOSTEL_STAFF')")
     public ApiResponse<LeaveRequest> getById(@PathVariable Long id) {
-        return ApiResponse.ok(leaveService.getById(id));
+        LeaveRequest leave = leaveService.getById(id);
+        UserPrincipal p = getPrincipal();
+        if (p != null && p.isHosteller() && !java.util.Objects.equals(p.getHostellerProfileId(), leave.getHostellerId())) {
+            throw new com.hostlify.shared.exception.AppException("Access denied", org.springframework.http.HttpStatus.FORBIDDEN);
+        }
+        if (p != null && p.isStaff()) com.hostlify.shared.security.HostelAccess.requireStaffHostel(leaveService.hostelIdOf(leave));
+        return ApiResponse.ok(leave);
     }
 
     @PostMapping
@@ -68,13 +100,13 @@ public class LeaveController {
     public ApiResponse<LeaveRequest> apply(@RequestBody LeaveRequest leave) {
         UserPrincipal p = getPrincipal();
         if (p != null) {
-            if (leave.getHostellerId() == null) {
-                leave.setHostellerId(p.getHostellerProfileId());
-            }
-            if (leave.getBookingId() == null) {
-                leave.setBookingId(p.getBookingId());
-            }
+            // Never trust ids from the body — the service resolves the active booking.
+            leave.setHostellerId(p.getHostellerProfileId());
+            leave.setBookingId(null);
         }
+        leave.setId(null);
+        leave.setReviewedBy(null);
+        leave.setReviewedAt(null);
         return ApiResponse.ok(leaveService.apply(leave));
     }
 
@@ -83,12 +115,16 @@ public class LeaveController {
     public ApiResponse<LeaveRequest> review(@PathVariable Long id, @RequestBody Map<String, Object> body) {
         String status = (String) body.get("status");
         UserPrincipal p = getPrincipal();
-        Long reviewedBy = null;
-        if (body.get("reviewedBy") != null) {
-            reviewedBy = Long.parseLong(body.get("reviewedBy").toString());
-        } else if (p != null) {
-            reviewedBy = p.getUserId();
+        LeaveRequest leave = leaveService.getById(id);
+        com.hostlify.shared.security.HostelAccess.requireStaffHostel(leaveService.hostelIdOf(leave));
+        if (!"APPROVED".equals(status) && !"REJECTED".equals(status)) {
+            throw new com.hostlify.shared.exception.AppException("status must be APPROVED or REJECTED", org.springframework.http.HttpStatus.BAD_REQUEST);
         }
+        if (!"PENDING".equals(leave.getStatus())) {
+            throw new com.hostlify.shared.exception.AppException("Leave request is already " + leave.getStatus(), org.springframework.http.HttpStatus.CONFLICT);
+        }
+        // Reviewer is always the caller (a client-supplied reviewedBy was trusted before)
+        Long reviewedBy = p != null ? p.getUserId() : null;
         return ApiResponse.ok(leaveService.review(id, status, reviewedBy));
     }
 }

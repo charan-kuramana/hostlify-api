@@ -54,14 +54,19 @@ public class ReviewService {
         if (rating < 1 || rating > 5) {
             throw new AppException("Rating must be between 1 and 5", HttpStatus.BAD_REQUEST);
         }
+        if (reviewText != null && reviewText.length() > 1000) {
+            throw new AppException("Review must be 1000 characters or less", HttpStatus.BAD_REQUEST);
+        }
 
-        HostelReview review = new HostelReview();
+        // One review per stay: re-submitting updates the existing review instead of adding duplicates
+        HostelReview review = reviewRepo.findFirstByHostellerIdAndBookingIdOrderByCreatedAtDesc(hostellerId, bookingId)
+                .orElseGet(HostelReview::new);
         review.setHostellerId(hostellerId);
         review.setHostelId(hostelId);
         review.setBookingId(bookingId);
         review.setRating(rating);
         review.setReviewText(reviewText);
-        review.setVisible(true);
+        if (review.getId() == null) review.setVisible(true); // keep staff's hide decision on edits
         return reviewRepo.save(review);
     }
 

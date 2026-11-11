@@ -46,8 +46,22 @@ public class ReferralController {
     @PostMapping("/validate")
     @Operation(summary = "Apply a referral code for a hosteller (called during registration)")
     public ApiResponse<String> validateCode(@RequestBody Map<String, String> body) {
+        UserPrincipal p = getPrincipal();
         String code = body.get("code");
-        Long hostellerId = Long.parseLong(body.get("hostellerId"));
+        Long hostellerId;
+        if (p.isHosteller()) {
+            // a hosteller can only apply a code to their own (new) account
+            hostellerId = p.getHostellerProfileId();
+        } else if (p.isStaff() || p.isSuperAdmin()) {
+            try {
+                hostellerId = Long.parseLong(String.valueOf(body.get("hostellerId")));
+            } catch (NumberFormatException e) {
+                throw new AppException("hostellerId is required", HttpStatus.BAD_REQUEST);
+            }
+        } else {
+            throw new AppException("Access denied", HttpStatus.FORBIDDEN);
+        }
+        if (hostellerId == null) throw new AppException("Hosteller profile not found", HttpStatus.BAD_REQUEST);
         referralService.applyReferral(code, hostellerId);
         return ApiResponse.ok("Referral applied successfully");
     }

@@ -31,6 +31,7 @@ public class MenuController {
     @PreAuthorize("hasAnyRole('HOSTELLER','HOSTEL_STAFF')")
     @Operation(summary = "Hosteller + Staff: get current week's menu")
     public ApiResponse<WeeklyMenu> getCurrentMenu(@RequestParam Long hostelId) {
+        com.hostlify.shared.security.HostelAccess.requireHostelMember(hostelId);
         return ApiResponse.ok(menuService.getCurrentMenu(hostelId));
     }
 
@@ -39,6 +40,7 @@ public class MenuController {
     @Operation(summary = "Get menu for a specific week")
     public ApiResponse<WeeklyMenu> getByWeek(@RequestParam Long hostelId,
                                                @RequestParam String weekStart) {
+        com.hostlify.shared.security.HostelAccess.requireHostelMember(hostelId);
         return ApiResponse.ok(menuService.getMenuByWeek(hostelId, LocalDate.parse(weekStart)));
     }
 
@@ -54,7 +56,10 @@ public class MenuController {
     @Operation(summary = "Staff: create or update a weekly menu")
     public ApiResponse<WeeklyMenu> saveMenu(@RequestBody Map<String, Object> body) {
         UserPrincipal principal = getPrincipal();
+        if (body.get("hostelId") == null) throw new com.hostlify.shared.exception.AppException("hostelId is required",
+                org.springframework.http.HttpStatus.BAD_REQUEST);
         Long hostelId = ((Number) body.get("hostelId")).longValue();
+        com.hostlify.shared.security.HostelAccess.requireStaffHostel(hostelId);
         String weekStartStr = (String) body.get("weekStart");
         LocalDate weekStart = weekStartStr != null ? LocalDate.parse(weekStartStr)
                 : LocalDate.now().with(java.time.DayOfWeek.MONDAY);
