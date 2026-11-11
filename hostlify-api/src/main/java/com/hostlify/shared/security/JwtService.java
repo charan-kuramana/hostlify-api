@@ -75,7 +75,24 @@ public class JwtService {
     }
 
     public String generateRefreshToken(AuthUser user) {
-        return buildToken(new HashMap<>(), user.getUuid(), refreshExpiry);
+        // typ distinguishes refresh tokens from access tokens; jti makes every token unique
+        // (its SHA-256 is stored in auth_refresh_tokens.token_hash, which is UNIQUE).
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("typ", "refresh");
+        claims.put("jti", java.util.UUID.randomUUID().toString());
+        return buildToken(claims, user.getUuid(), refreshExpiry);
+    }
+
+    /** SHA-256 hex of a token, used to store/look up refresh tokens without keeping them in clear. */
+    public static String hash(String token) {
+        try {
+            byte[] d = java.security.MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder();
+            for (byte b : d) sb.append(String.format("%02x", b));
+            return sb.toString();
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     private String buildToken(Map<String, Object> extraClaims, String subject, long expiration) {

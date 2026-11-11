@@ -5,6 +5,8 @@ import com.hostlify.module.booking.service.BookingService;
 import com.hostlify.module.hosteller.entity.HostellerProfile;
 import com.hostlify.shared.dto.ApiResponse;
 import com.hostlify.shared.security.CurrentUser;
+import com.hostlify.shared.security.HostelAccess;
+import com.hostlify.module.hostel.service.HostelService;
 import com.hostlify.shared.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -24,9 +26,11 @@ import java.util.Map;
 public class BookingController {
 
     private final BookingService bookingService;
+    private final HostelService hostelService;
 
-    public BookingController(BookingService bookingService) {
+    public BookingController(BookingService bookingService, HostelService hostelService) {
         this.bookingService = bookingService;
+        this.hostelService = hostelService;
     }
 
     /** Staff: list pending allocations for a hostel */
@@ -45,10 +49,16 @@ public class BookingController {
     public ApiResponse<BookingCheckin> allocate(@RequestBody Map<String, Object> body) {
         Long hostellerAuthUserId = getLong(body, "hostellerAuthUserId");
         Long bedId = getLong(body, "bedId");
+        // Staff may only allocate beds in their own hostel
+        HostelAccess.requireStaffHostel(hostelService.getBed(bedId).getHostelId());
         String dateStr = (String) body.get("checkInDate");
         LocalDate checkIn = dateStr != null ? LocalDate.parse(dateStr) : LocalDate.now();
         BigDecimal rent = body.get("monthlyRent") != null ? new BigDecimal(body.get("monthlyRent").toString()) : null;
         BigDecimal advance = body.get("advanceAmount") != null ? new BigDecimal(body.get("advanceAmount").toString()) : BigDecimal.ZERO;
+        if (rent != null && rent.signum() <= 0) throw new com.hostlify.shared.exception.AppException(
+                "monthlyRent must be greater than 0", org.springframework.http.HttpStatus.BAD_REQUEST);
+        if (advance.signum() < 0) throw new com.hostlify.shared.exception.AppException(
+                "advanceAmount cannot be negative", org.springframework.http.HttpStatus.BAD_REQUEST);
         String paymentMode = (String) body.getOrDefault("advancePaymentMode", "CASH");
         return ApiResponse.ok(bookingService.allocateBed(hostellerAuthUserId, bedId, checkIn, rent, advance, paymentMode),
                 "Bed allocated successfully");
@@ -68,7 +78,9 @@ public class BookingController {
     @PreAuthorize("hasRole('HOSTEL_STAFF')")
     @Operation(summary = "Staff: get booking by id")
     public ApiResponse<BookingCheckin> getById(@PathVariable Long id) {
-        return ApiResponse.ok(bookingService.getById(id));
+        BookingCheckin booking = bookingService.getById(id);
+        HostelAccess.requireStaffHostel(booking.getHostelId());
+        return ApiResponse.ok(booking);
     }
 
     /** Staff: list all bookings for a hostel */
@@ -85,8 +97,9 @@ public class BookingController {
     @PreAuthorize("hasRole('HOSTEL_STAFF')")
     @Operation(summary = "Staff: checkout a hosteller")
     public ApiResponse<BookingCheckin> checkout(@PathVariable Long id,
-                                                 @RequestBody Map<String, String> body) {
-        return ApiResponse.ok(bookingService.checkout(id, body.get("reason")));
+                                                 @RequestBody(required = false) Map<String, String> body) {
+        HostelAccess.requireStaffHostel(bookingService.getById(id).getHostelId());
+        return ApiResponse.ok(bookingService.checkout(id, body != null ? body.get("reason") : null));
     }
 
     /** Staff: cancel a pending/active booking */
@@ -94,17 +107,25 @@ public class BookingController {
     @PreAuthorize("hasRole('HOSTEL_STAFF')")
     @Operation(summary = "Staff: cancel a booking")
     public ApiResponse<BookingCheckin> cancel(@PathVariable Long id) {
+        HostelAccess.requireStaffHostel(bookingService.getById(id).getHostelId());
         return ApiResponse.ok(bookingService.cancelAllocation(id));
     }
 
-    // Legacy endpoints
+    // Legacy endpoints — staff only (previously open to any authenticated user, incl. hostellers)
     @GetMapping("/hosteller/{hostellerId}")
+    @PreAuthorize("hasRole('HOSTEL_STAFF')")
     public ApiResponse<List<BookingCheckin>> getByHosteller(@PathVariable Long hostellerId) {
-        return ApiResponse.ok(bookingService.getByHosteller(hostellerId));
+        UserPrincipal p = getPrincipal();
+        // Staff: only bookings in their own hostels
+        return ApiResponse.ok(bookingService.getByHosteller(hostellerId).stream()
+                .filter(b -> p.isSuperAdmin() || (p.getHostelIds() != null && p.getHostelIds().contains(b.getHostelId())))
+                .toList());
     }
 
     @PostMapping("/checkin")
+    @PreAuthorize("hasRole('HOSTEL_STAFF')")
     public ApiResponse<BookingCheckin> checkin(@RequestBody BookingCheckin booking) {
+        HostelAccess.requireStaffHostel(booking.getHostelId());
         return ApiResponse.ok(bookingService.checkin(booking));
     }
 

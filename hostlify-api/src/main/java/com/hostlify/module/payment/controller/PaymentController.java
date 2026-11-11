@@ -6,6 +6,7 @@ import com.hostlify.module.payment.entity.PaymentRecord;
 import com.hostlify.module.payment.service.PaymentService;
 import com.hostlify.shared.dto.ApiResponse;
 import com.hostlify.shared.security.UserPrincipal;
+import com.hostlify.shared.security.HostelAccess;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -95,6 +96,8 @@ public class PaymentController {
         String dateStr = (String) body.get("paymentDate");
         LocalDate date = dateStr != null ? LocalDate.parse(dateStr) : LocalDate.now();
         String notes = (String) body.get("notes");
+        HostelAccess.denySupervisor();
+        HostelAccess.requireStaffHostel(paymentService.getDue(dueId).getHostelId());
         return ApiResponse.ok(paymentService.recordCashPayment(
                 principal.getUserId(), hostellerId, dueId, amount, method, txRef, date, notes));
     }
@@ -107,6 +110,12 @@ public class PaymentController {
     public ApiResponse<Map<String, Integer>> generateDues(@RequestParam Long hostelId,
                                                            @RequestParam int month,
                                                            @RequestParam int year) {
+        HostelAccess.denySupervisor();
+        HostelAccess.requireStaffHostel(hostelId);
+        if (month < 1 || month > 12 || year < 2000 || year > 2100) {
+            throw new com.hostlify.shared.exception.AppException("Invalid month/year",
+                    org.springframework.http.HttpStatus.BAD_REQUEST);
+        }
         int count = paymentService.generateMonthlyDues(hostelId, month, year);
         return ApiResponse.ok(Map.of("generatedCount", count),
                 "Dues generated: " + count);
@@ -116,6 +125,7 @@ public class PaymentController {
     @PreAuthorize("hasRole('HOSTEL_STAFF')")
     @Operation(summary = "Staff: list pending dues for a hostel")
     public ApiResponse<List<PaymentDue>> getPendingByHostel(@PathVariable Long hostelId) {
+        HostelAccess.requireStaffHostel(hostelId);
         return ApiResponse.ok(paymentService.getPendingDuesByHostel(hostelId));
     }
 
@@ -123,6 +133,7 @@ public class PaymentController {
     @PreAuthorize("hasRole('HOSTEL_STAFF')")
     @Operation(summary = "Staff: all dues (paid + unpaid) for a hostel")
     public ApiResponse<List<PaymentDue>> getAllDuesByHostel(@PathVariable Long hostelId) {
+        HostelAccess.requireStaffHostel(hostelId);
         return ApiResponse.ok(paymentService.getAllDuesByHostel(hostelId));
     }
 
@@ -130,6 +141,7 @@ public class PaymentController {
     @PreAuthorize("hasRole('HOSTEL_STAFF')")
     @Operation(summary = "Staff: all payments received for a hostel")
     public ApiResponse<List<Map<String, Object>>> getRecordsByHostel(@PathVariable Long hostelId) {
+        HostelAccess.requireStaffHostel(hostelId);
         return ApiResponse.ok(paymentService.getRecordsByHostel(hostelId));
     }
 
@@ -139,6 +151,8 @@ public class PaymentController {
     @PreAuthorize("hasRole('HOSTEL_STAFF')")
     @Operation(summary = "Staff: apply a discount or late fee to a payment due")
     public ApiResponse<?> adjustDue(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        HostelAccess.denySupervisor();
+        HostelAccess.requireStaffHostel(paymentService.getDue(id).getHostelId());
         BigDecimal amount = new BigDecimal(body.get("adjustmentAmount").toString());
         String type = (String) body.get("adjustmentType"); // DISCOUNT | LATE_FEE
         String notes = (String) body.getOrDefault("notes", null);
@@ -149,32 +163,54 @@ public class PaymentController {
     @PreAuthorize("hasAnyRole('HOSTELLER','HOSTEL_STAFF')")
     @Operation(summary = "Hosteller / Staff: get payment receipt for a due")
     public ApiResponse<?> getReceipt(@PathVariable Long dueId) {
+        UserPrincipal p = getPrincipal();
+        if (p.isHosteller() && !java.util.Objects.equals(paymentService.getDue(dueId).getHostellerId(), p.getHostellerProfileId())) {
+            throw new com.hostlify.shared.exception.AppException("Access denied",
+                    org.springframework.http.HttpStatus.FORBIDDEN);
+        }
+        if (p.isStaff()) HostelAccess.requireStaffHostel(paymentService.getDue(dueId).getHostelId());
         return ApiResponse.ok(paymentService.generateReceipt(dueId));
     }
 
     // ─── Legacy endpoints ────────────────────────────────────────
+    // Staff only: these had no @PreAuthorize, so any hosteller could read others' dues
+    // or even mark their own due as paid.
 
     @GetMapping("/dues/hosteller/{hostellerId}")
+    @PreAuthorize("hasRole('HOSTEL_STAFF')")
     public ApiResponse<List<PaymentDue>> getDuesByHosteller(@PathVariable Long hostellerId) {
-        return ApiResponse.ok(paymentService.getDuesByHosteller(hostellerId));
+        UserPrincipal p = getPrincipal();
+        return ApiResponse.ok(paymentService.getDuesByHosteller(hostellerId).stream()
+                .filter(d -> p.isSuperAdmin() || (p.getHostelIds() != null && p.getHostelIds().contains(d.getHostelId())))
+                .toList());
     }
 
     @GetMapping("/dues/{id}")
+    @PreAuthorize("hasRole('HOSTEL_STAFF')")
     public ApiResponse<PaymentDue> getDue(@PathVariable Long id) {
-        return ApiResponse.ok(paymentService.getDue(id));
+        PaymentDue due = paymentService.getDue(id);
+        HostelAccess.requireStaffHostel(due.getHostelId());
+        return ApiResponse.ok(due);
     }
 
     @PostMapping("/dues")
+    @PreAuthorize("hasRole('HOSTEL_STAFF')")
     public ApiResponse<PaymentDue> createDue(@RequestBody PaymentDue due) {
+        HostelAccess.denySupervisor();
+        HostelAccess.requireStaffHostel(due.getHostelId());
         return ApiResponse.ok(paymentService.createDue(due));
     }
 
     @PutMapping("/dues/{id}/mark-paid")
+    @PreAuthorize("hasRole('HOSTEL_STAFF')")
     public ApiResponse<PaymentDue> markPaid(@PathVariable Long id) {
+        HostelAccess.denySupervisor();
+        HostelAccess.requireStaffHostel(paymentService.getDue(id).getHostelId());
         return ApiResponse.ok(paymentService.markPaid(id));
     }
 
     @GetMapping("/orders/hosteller/{hostellerId}")
+    @PreAuthorize("hasRole('HOSTEL_STAFF')")
     public ApiResponse<List<PaymentRazorpayOrder>> getOrders(@PathVariable Long hostellerId) {
         return ApiResponse.ok(paymentService.getOrdersByHosteller(hostellerId));
     }

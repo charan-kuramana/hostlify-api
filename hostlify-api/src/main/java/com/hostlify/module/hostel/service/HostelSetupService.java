@@ -65,6 +65,8 @@ public class HostelSetupService {
             // Accept roomType or tierName
             String roomType = t.containsKey("roomType") ? (String) t.get("roomType") : (String) t.get("tierName");
             if (roomType == null || roomType.isBlank()) continue;  // skip invalid tier
+            // Room types are stored upper-case (SINGLE, DOUBLE…) so "double" updates the DOUBLE tier
+            roomType = roomType.trim().toUpperCase().replaceAll("[\\s-]+", "_");
 
             HostelPricing pricing = pricingRepo.findByHostelIdAndRoomType(hostelId, roomType)
                     .orElse(new HostelPricing());
@@ -81,6 +83,14 @@ public class HostelSetupService {
 
             pricing.setDepositMonths(t.get("depositMonths") != null ? ((Number) t.get("depositMonths")).intValue() : 2);
             pricing.setLateFee(t.get("lateFee") != null ? new BigDecimal(t.get("lateFee").toString()) : BigDecimal.ZERO);
+            if (pricing.getBaseRent().signum() <= 0) {
+                throw new com.hostlify.shared.exception.AppException("Rent for " + roomType + " must be greater than 0",
+                        org.springframework.http.HttpStatus.BAD_REQUEST);
+            }
+            if (pricing.getDepositMonths() < 0 || pricing.getDepositMonths() > 12 || pricing.getLateFee().signum() < 0) {
+                throw new com.hostlify.shared.exception.AppException("Deposit months must be 0–12 and late fee cannot be negative",
+                        org.springframework.http.HttpStatus.BAD_REQUEST);
+            }
             pricing.setActive(true);
             saved.add(pricingRepo.save(pricing));
         }

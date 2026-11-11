@@ -11,6 +11,8 @@ import java.util.List;
 public interface HostelReviewRepository extends JpaRepository<HostelReview, Long> {
     List<HostelReview> findByHostelIdAndIsVisibleTrue(Long hostelId);
 
+    java.util.Optional<HostelReview> findFirstByHostellerIdAndBookingIdOrderByCreatedAtDesc(Long hostellerId, Long bookingId);
+
     @Query("SELECT AVG(r.rating) FROM HostelReview r WHERE r.hostelId = :hostelId AND r.isVisible = true")
     Double findAverageRatingByHostelId(Long hostelId);
 }

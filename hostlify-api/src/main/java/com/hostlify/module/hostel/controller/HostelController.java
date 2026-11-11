@@ -6,6 +6,7 @@ import com.hostlify.shared.dto.ApiResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.access.prepost.PreAuthorize;
+import com.hostlify.shared.security.HostelAccess;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -23,26 +24,31 @@ public class HostelController {
 
     // Owner endpoints
     @GetMapping("/owners")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ApiResponse<List<HostelOwner>> getAllOwners() {
         return ApiResponse.ok(hostelService.getAllOwners());
     }
 
     @GetMapping("/owners/{id}")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ApiResponse<HostelOwner> getOwner(@PathVariable Long id) {
         return ApiResponse.ok(hostelService.getOwner(id));
     }
 
     @PostMapping("/owners")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ApiResponse<HostelOwner> createOwner(@RequestBody HostelOwner owner) {
         return ApiResponse.ok(hostelService.createOwner(owner));
     }
 
     @PutMapping("/owners/{id}")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ApiResponse<HostelOwner> updateOwner(@PathVariable Long id, @RequestBody HostelOwner owner) {
         return ApiResponse.ok(hostelService.updateOwner(id, owner));
     }
 
     @DeleteMapping("/owners/{id}")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ApiResponse<Void> deleteOwner(@PathVariable Long id) {
         hostelService.deleteOwner(id);
         return ApiResponse.ok(null, "Owner deleted");
@@ -61,11 +67,13 @@ public class HostelController {
     }
 
     @GetMapping("/owners/{ownerId}/hostels")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ApiResponse<List<Hostel>> getHostelsByOwner(@PathVariable Long ownerId) {
         return ApiResponse.ok(hostelService.getHostelsByOwner(ownerId));
     }
 
     @PostMapping("/hostels")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ApiResponse<Hostel> createHostel(@RequestBody Hostel hostel) {
         return ApiResponse.ok(hostelService.createHostel(hostel));
     }
@@ -73,10 +81,13 @@ public class HostelController {
     @PutMapping("/hostels/{id}")
     @PreAuthorize("hasAnyRole('HOSTEL_STAFF','SUPER_ADMIN')")
     public ApiResponse<Hostel> updateHostel(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        HostelAccess.requireStaffHostel(id);
+        HostelAccess.requireSubRole("OWNER", "ADMIN", "MANAGER");
         return ApiResponse.ok(hostelService.partialUpdateHostel(id, body));
     }
 
     @DeleteMapping("/hostels/{id}")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ApiResponse<Void> deleteHostel(@PathVariable Long id) {
         hostelService.deleteHostel(id);
         return ApiResponse.ok(null, "Hostel deleted");
@@ -86,6 +97,8 @@ public class HostelController {
     @PreAuthorize("hasRole('HOSTEL_STAFF')")
     public ApiResponse<Hostel> updateHostelSettings(@PathVariable Long id,
                                                      @RequestBody Map<String, Object> body) {
+        HostelAccess.requireStaffHostel(id);
+        HostelAccess.requireSubRole("OWNER", "ADMIN", "MANAGER");
         Hostel hostel = hostelService.getHostel(id);
         if (body.containsKey("onlinePaymentEnabled")) {
             hostel.setOnlinePaymentEnabled(Boolean.TRUE.equals(body.get("onlinePaymentEnabled")));
@@ -100,13 +113,46 @@ public class HostelController {
     }
 
     @PostMapping("/hostels/{hostelId}/floors")
+    @PreAuthorize("hasRole('HOSTEL_STAFF')")
     public ApiResponse<Floor> createFloor(@PathVariable Long hostelId, @RequestBody Floor floor) {
+        HostelAccess.requireStaffHostel(hostelId);
+        if (floor.getFloorName() == null || floor.getFloorName().isBlank()) {
+            throw new com.hostlify.shared.exception.AppException("Floor name is required", org.springframework.http.HttpStatus.BAD_REQUEST);
+        }
+        floor.setFloorName(floor.getFloorName().trim());
+        boolean duplicate = hostelService.getFloorsByHostel(hostelId).stream()
+                .anyMatch(f -> f.getFloorName() != null && f.getFloorName().equalsIgnoreCase(floor.getFloorName()));
+        if (duplicate) {
+            throw new com.hostlify.shared.exception.AppException("A floor with this name already exists", org.springframework.http.HttpStatus.CONFLICT);
+        }
+        floor.setId(null);
         floor.setHostelId(hostelId);
         return ApiResponse.ok(hostelService.createFloor(floor));
     }
 
+    /** Staff: rename a floor */
+    @PutMapping("/floors/{id}")
+    @PreAuthorize("hasRole('HOSTEL_STAFF')")
+    public ApiResponse<Floor> renameFloor(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        Floor floor = hostelService.getFloor(id);
+        HostelAccess.requireStaffHostel(floor.getHostelId());
+        String name = body.get("floorName") != null ? body.get("floorName").toString().trim() : "";
+        if (name.isEmpty()) {
+            throw new com.hostlify.shared.exception.AppException("Floor name is required", org.springframework.http.HttpStatus.BAD_REQUEST);
+        }
+        boolean duplicate = hostelService.getFloorsByHostel(floor.getHostelId()).stream()
+                .anyMatch(f -> !f.getId().equals(id) && f.getFloorName() != null && f.getFloorName().equalsIgnoreCase(name));
+        if (duplicate) {
+            throw new com.hostlify.shared.exception.AppException("A floor with this name already exists", org.springframework.http.HttpStatus.CONFLICT);
+        }
+        floor.setFloorName(name);
+        return ApiResponse.ok(hostelService.createFloor(floor), "Floor renamed");
+    }
+
     @DeleteMapping("/floors/{id}")
+    @PreAuthorize("hasRole('HOSTEL_STAFF')")
     public ApiResponse<Void> deleteFloor(@PathVariable Long id) {
+        HostelAccess.requireStaffHostel(hostelService.getFloor(id).getHostelId());
         hostelService.deleteFloor(id);
         return ApiResponse.ok(null, "Floor deleted");
     }
@@ -118,9 +164,11 @@ public class HostelController {
     }
 
     @PostMapping("/floors/{floorId}/rooms")
+    @PreAuthorize("hasRole('HOSTEL_STAFF')")
     public ApiResponse<Room> createRoom(@PathVariable Long floorId, @RequestBody Map<String, Object> body) {
         // Get floor to find hostelId
         Floor floor = hostelService.getFloor(floorId);
+        HostelAccess.requireStaffHostel(floor.getHostelId());
         if (floor.getHostelId() == null) {
             throw new com.hostlify.shared.exception.AppException("Floor has no associated hostel", org.springframework.http.HttpStatus.BAD_REQUEST);
         }
@@ -149,7 +197,9 @@ public class HostelController {
     }
 
     @DeleteMapping("/rooms/{id}")
+    @PreAuthorize("hasRole('HOSTEL_STAFF')")
     public ApiResponse<Void> deleteRoom(@PathVariable Long id) {
+        HostelAccess.requireStaffHostel(hostelService.getRoom(id).getHostelId());
         hostelService.deleteRoom(id);
         return ApiResponse.ok(null, "Room deleted");
     }
@@ -161,8 +211,10 @@ public class HostelController {
     }
 
     @PostMapping("/rooms/{roomId}/beds")
+    @PreAuthorize("hasRole('HOSTEL_STAFF')")
     public ApiResponse<Bed> createBed(@PathVariable Long roomId, @RequestBody Map<String, Object> body) {
         Room room = hostelService.getRoom(roomId);
+        HostelAccess.requireStaffHostel(room.getHostelId());
         Bed bed = new Bed();
         bed.setRoomId(roomId);
         bed.setHostelId(room.getHostelId());
@@ -175,13 +227,20 @@ public class HostelController {
             long existingCount = hostelService.getBedsByRoom(roomId).size();
             bedName = room.getRoomName() + "-" + (char)('A' + existingCount);
         }
+        final String newBedName = bedName.trim();
+        if (hostelService.getBedsByRoom(roomId).stream().anyMatch(b -> newBedName.equalsIgnoreCase(b.getBedName()))) {
+            throw new com.hostlify.shared.exception.AppException("A bed named " + newBedName + " already exists in this room", org.springframework.http.HttpStatus.CONFLICT);
+        }
+        bedName = newBedName;
         bed.setBedName(bedName);
         bed.setStatus("AVAILABLE");
         return ApiResponse.ok(hostelService.createBed(bed));
     }
 
     @DeleteMapping("/beds/{id}")
+    @PreAuthorize("hasRole('HOSTEL_STAFF')")
     public ApiResponse<Void> deleteBed(@PathVariable Long id) {
+        HostelAccess.requireStaffHostel(hostelService.getBed(id).getHostelId());
         hostelService.deleteBed(id);
         return ApiResponse.ok(null, "Bed deleted");
     }

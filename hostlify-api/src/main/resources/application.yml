@@ -4,6 +4,11 @@ server:
 spring:
   profiles:
     active: dev
+  servlet:
+    multipart:
+      # Uploads are capped at 5 MB in code (clear 413 message); this outer limit just bounds the request
+      max-file-size: 10MB
+      max-request-size: 11MB
   jpa:
     hibernate:
       ddl-auto: validate

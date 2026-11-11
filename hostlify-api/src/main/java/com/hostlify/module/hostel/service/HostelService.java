@@ -79,6 +79,7 @@ public class HostelService {
 
     @Transactional
     public Hostel partialUpdateHostel(Long id, Map<String, Object> body) {
+        validateHostelUpdate(body);
         Hostel existing = getHostel(id);
         if (body.containsKey("name")) existing.setName((String) body.get("name"));
         if (body.containsKey("hostelName")) existing.setName((String) body.get("hostelName"));
@@ -104,6 +105,37 @@ public class HostelService {
         if (existing.getPincode() == null || existing.getPincode().isBlank()) existing.setPincode("000000");
         return hostelRepo.save(existing);
     }
+    /** Server-side checks for hostel profile edits; only fields present in the request are checked. */
+    private void validateHostelUpdate(Map<String, Object> body) {
+        for (String key : List.of("name", "hostelName", "city")) {
+            if (body.containsKey(key) && (body.get(key) == null || body.get(key).toString().isBlank())) {
+                throw new AppException(("city".equals(key) ? "City" : "Hostel name") + " cannot be empty", HttpStatus.BAD_REQUEST);
+            }
+        }
+        if (body.containsKey("pincode") && (body.get("pincode") == null
+                || !body.get("pincode").toString().trim().matches("[1-9]\\d{5}"))) {
+            throw new AppException("Pincode must be a valid 6-digit PIN code", HttpStatus.BAD_REQUEST);
+        }
+        for (String key : List.of("contact", "contactPhone")) {
+            Object v = body.get(key);
+            if (v == null || v.toString().isBlank()) continue;
+            // Mobile or landline with STD code; spaces, dashes and a +91 prefix are allowed
+            String digits = v.toString().replaceAll("[\\s-]", "").replaceFirst("^\\+91", "");
+            if (!digits.matches("0?\\d{10}")) {
+                throw new AppException("Contact phone must be a valid 10-digit number", HttpStatus.BAD_REQUEST);
+            }
+        }
+        if (body.get("defaultRent") != null) {
+            try {
+                if (new BigDecimal(body.get("defaultRent").toString()).signum() < 0) {
+                    throw new AppException("Default rent cannot be negative", HttpStatus.BAD_REQUEST);
+                }
+            } catch (NumberFormatException e) {
+                throw new AppException("Default rent must be a number", HttpStatus.BAD_REQUEST);
+            }
+        }
+    }
+
     @Transactional
     public void deleteHostel(Long id) {
         Hostel hostel = getHostel(id);

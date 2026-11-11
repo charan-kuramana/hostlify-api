@@ -22,15 +22,24 @@ import java.util.Map;
 public class ParkingController {
 
     private final ParkingService parkingService;
+    private final com.hostlify.module.service.repository.ParkingRecordRepository parkingRepo;
 
-    public ParkingController(ParkingService parkingService) {
+    public ParkingController(ParkingService parkingService,
+                             com.hostlify.module.service.repository.ParkingRecordRepository parkingRepo) {
         this.parkingService = parkingService;
+        this.parkingRepo = parkingRepo;
+    }
+
+    private ParkingRecord loadRecord(Long recordId) {
+        return parkingRepo.findById(recordId)
+                .orElseThrow(() -> new AppException("Parking record not found", HttpStatus.NOT_FOUND));
     }
 
     @GetMapping("/hostel/{hostelId}")
     @PreAuthorize("hasRole('HOSTEL_STAFF')")
     @Operation(summary = "Staff: list all active parking registrations for a hostel")
     public ApiResponse<List<ParkingRecord>> getActiveParking(@PathVariable Long hostelId) {
+        com.hostlify.shared.security.HostelAccess.requireStaffHostel(hostelId);
         return ApiResponse.ok(parkingService.getActiveParking(hostelId));
     }
 
@@ -49,7 +58,7 @@ public class ParkingController {
         UserPrincipal p = getPrincipal();
         String vehicleNumber = (String) body.get("vehicleNumber");
         String vehicleType = (String) body.get("vehicleType");
-        String slotNumber = (String) body.getOrDefault("slotNumber", null);
+        String slotNumber = null; // slots are assigned by staff, not chosen by the hosteller
 
         if (vehicleNumber == null || vehicleType == null) {
             throw new AppException("vehicleNumber and vehicleType are required", HttpStatus.BAD_REQUEST);
@@ -64,7 +73,11 @@ public class ParkingController {
     @PreAuthorize("hasAnyRole('HOSTEL_STAFF','HOSTELLER')")
     @Operation(summary = "Staff or Hosteller: deregister a parking record")
     public ApiResponse<ParkingRecord> deregister(@PathVariable Long recordId) {
-        return ApiResponse.ok(parkingService.deregisterParking(recordId), "Parking record removed");
+        UserPrincipal p = getPrincipal();
+        // hostellers may only remove their own vehicle
+        Long owner = p.isHosteller() ? (p.getHostellerProfileId() != null ? p.getHostellerProfileId() : -1L) : null;
+        if (p.isStaff()) com.hostlify.shared.security.HostelAccess.requireStaffHostel(loadRecord(recordId).getHostelId());
+        return ApiResponse.ok(parkingService.deregisterParking(recordId, owner), "Parking record removed");
     }
 
     @PatchMapping("/{recordId}/slot")
@@ -72,7 +85,17 @@ public class ParkingController {
     @Operation(summary = "Staff: update the slot number for a parking record")
     public ApiResponse<ParkingRecord> updateSlot(@PathVariable Long recordId,
                                                    @RequestParam String slotNumber) {
-        return ApiResponse.ok(parkingService.updateSlot(recordId, slotNumber), "Slot updated");
+        ParkingRecord record = loadRecord(recordId);
+        com.hostlify.shared.security.HostelAccess.requireStaffHostel(record.getHostelId());
+        String slot = slotNumber == null ? "" : slotNumber.trim().toUpperCase();
+        if (slot.isEmpty() || slot.length() > 20) {
+            throw new AppException("Enter a valid slot number", HttpStatus.BAD_REQUEST);
+        }
+        // One vehicle per slot within a hostel
+        boolean taken = parkingRepo.findByHostelIdAndStatus(record.getHostelId(), "ACTIVE").stream()
+                .anyMatch(r -> !r.getId().equals(recordId) && slot.equalsIgnoreCase(r.getSlotNumber()));
+        if (taken) throw new AppException("Slot " + slot + " is already assigned to another vehicle", HttpStatus.CONFLICT);
+        return ApiResponse.ok(parkingService.updateSlot(recordId, slot), "Slot updated");
     }
 
     private UserPrincipal getPrincipal() {

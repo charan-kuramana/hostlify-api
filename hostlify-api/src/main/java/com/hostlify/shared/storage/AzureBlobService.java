@@ -51,6 +51,10 @@ public class AzureBlobService {
             blobClient.setHttpHeaders(headers);
         } catch (IOException e) {
             throw new AppException("Failed to upload file: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        } catch (RuntimeException e) {
+            // Storage misconfigured or unreachable (e.g. placeholder credentials locally): clear message, not a bare 500
+            org.slf4j.LoggerFactory.getLogger(AzureBlobService.class).warn("Blob upload failed: {}", e.getMessage());
+            throw new AppException("File storage is unavailable right now. Please try again later.", HttpStatus.SERVICE_UNAVAILABLE);
         }
         return blobName;
     }

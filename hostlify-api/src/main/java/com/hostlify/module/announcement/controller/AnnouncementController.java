@@ -24,19 +24,23 @@ public class AnnouncementController {
     @GetMapping("/hostel/{hostelId}")
     @PreAuthorize("hasAnyRole('HOSTELLER','HOSTEL_STAFF')")
     public ApiResponse<List<Announcement>> getVisible(@PathVariable Long hostelId) {
+        com.hostlify.shared.security.HostelAccess.requireHostelMember(hostelId);
         return ApiResponse.ok(announcementService.getVisibleByHostel(hostelId));
     }
 
     @GetMapping("/hostel/{hostelId}/all")
     @PreAuthorize("hasRole('HOSTEL_STAFF')")
     public ApiResponse<List<Announcement>> getAll(@PathVariable Long hostelId) {
+        com.hostlify.shared.security.HostelAccess.requireStaffHostel(hostelId);
         return ApiResponse.ok(announcementService.getAllByHostel(hostelId));
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('HOSTELLER','HOSTEL_STAFF')")
     public ApiResponse<Announcement> getById(@PathVariable Long id) {
-        return ApiResponse.ok(announcementService.getById(id));
+        Announcement a = announcementService.getById(id);
+        com.hostlify.shared.security.HostelAccess.requireHostelMember(a.getHostelId());
+        return ApiResponse.ok(a);
     }
 
     @PostMapping
@@ -52,18 +56,29 @@ public class AnnouncementController {
                 announcement.setHostelId(principal.getHostelIds().get(0));
             }
         }
+        com.hostlify.shared.security.HostelAccess.requireStaffHostel(announcement.getHostelId());
+        announcement.setId(null);
+        if (announcement.getTitle() == null || announcement.getTitle().isBlank()) {
+            throw new com.hostlify.shared.exception.AppException("Title is required", org.springframework.http.HttpStatus.BAD_REQUEST);
+        }
+        if (announcement.getValidTill() != null && announcement.getValidFrom() != null
+                && announcement.getValidTill().isBefore(announcement.getValidFrom())) {
+            throw new com.hostlify.shared.exception.AppException("Valid till must be after valid from", org.springframework.http.HttpStatus.BAD_REQUEST);
+        }
         return ApiResponse.ok(announcementService.create(announcement));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('HOSTEL_STAFF')")
     public ApiResponse<Announcement> update(@PathVariable Long id, @RequestBody Announcement announcement) {
+        com.hostlify.shared.security.HostelAccess.requireStaffHostel(announcementService.getById(id).getHostelId());
         return ApiResponse.ok(announcementService.update(id, announcement));
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('HOSTEL_STAFF')")
     public ApiResponse<Void> delete(@PathVariable Long id) {
+        com.hostlify.shared.security.HostelAccess.requireStaffHostel(announcementService.getById(id).getHostelId());
         announcementService.delete(id);
         return ApiResponse.ok(null, "Announcement deleted");
     }

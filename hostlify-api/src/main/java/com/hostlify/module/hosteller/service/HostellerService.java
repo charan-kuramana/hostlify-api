@@ -62,6 +62,7 @@ public class HostellerService {
 
     @Transactional
     public HostellerProfile update(Long id, HostellerProfile req) {
+        validateProfile(req);
         HostellerProfile existing = getById(id);
         // Copy all editable personal-detail fields (only when provided, so partial updates don't wipe).
         if (req.getFirstName() != null)        existing.setFirstName(req.getFirstName());
@@ -78,6 +79,35 @@ public class HostellerService {
         if (req.getIdProofType() != null)      existing.setIdProofType(req.getIdProofType());
         if (req.getIdProofNumber() != null)    existing.setIdProofNumber(req.getIdProofNumber());
         return profileRepo.save(existing);
+    }
+
+    // Indian mobile: 10 digits starting 6-9 · PIN code: 6 digits, not starting with 0
+    private static final java.util.regex.Pattern MOBILE = java.util.regex.Pattern.compile("[6-9]\\d{9}");
+    private static final java.util.regex.Pattern PINCODE = java.util.regex.Pattern.compile("[1-9]\\d{5}");
+
+    /** Server-side checks for profile edits; only fields present in the request are validated. */
+    private void validateProfile(HostellerProfile req) {
+        if (req.getFirstName() != null && req.getFirstName().isBlank()) {
+            throw new AppException("First name cannot be empty", HttpStatus.BAD_REQUEST);
+        }
+        if (req.getMobile() != null && !MOBILE.matcher(req.getMobile().trim()).matches()) {
+            throw new AppException("Mobile must be a valid 10-digit number starting with 6-9", HttpStatus.BAD_REQUEST);
+        }
+        if (req.getAltMobile() != null && !req.getAltMobile().isBlank() && !MOBILE.matcher(req.getAltMobile().trim()).matches()) {
+            throw new AppException("Alternate mobile must be a valid 10-digit number starting with 6-9", HttpStatus.BAD_REQUEST);
+        }
+        if (req.getPincode() != null && !req.getPincode().isBlank() && !PINCODE.matcher(req.getPincode().trim()).matches()) {
+            throw new AppException("Pincode must be a valid 6-digit PIN code", HttpStatus.BAD_REQUEST);
+        }
+        if (req.getDateOfBirth() != null) {
+            java.time.LocalDate today = java.time.LocalDate.now();
+            if (req.getDateOfBirth().isAfter(today)) {
+                throw new AppException("Date of birth cannot be in the future", HttpStatus.BAD_REQUEST);
+            }
+            if (req.getDateOfBirth().isBefore(today.minusYears(100))) {
+                throw new AppException("Date of birth is not valid", HttpStatus.BAD_REQUEST);
+            }
+        }
     }
 
     @Transactional
@@ -105,6 +135,12 @@ public class HostellerService {
         var c = emergencyRepo.findFirstByHostellerId(hostellerId)
                 .orElseGet(com.hostlify.module.hosteller.entity.HostellerEmergencyContact::new);
         c.setHostellerId(hostellerId);
+        if (req.getMobile() != null && !MOBILE.matcher(req.getMobile().trim()).matches()) {
+            throw new AppException("Emergency contact mobile must be a valid 10-digit number", HttpStatus.BAD_REQUEST);
+        }
+        if (req.getAltMobile() != null && !req.getAltMobile().isBlank() && !MOBILE.matcher(req.getAltMobile().trim()).matches()) {
+            throw new AppException("Emergency contact alternate mobile must be a valid 10-digit number", HttpStatus.BAD_REQUEST);
+        }
         if (req.getName() != null) c.setName(req.getName());
         if (req.getRelationship() != null) c.setRelationship(req.getRelationship());
         if (req.getMobile() != null) c.setMobile(req.getMobile());

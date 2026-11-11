@@ -17,10 +17,13 @@ public class ReferralService {
 
     private final ReferralCodeRepository codeRepo;
     private final ReferralRecordRepository recordRepo;
+    private final com.hostlify.module.hosteller.repository.HostellerProfileRepository profileRepo;
 
-    public ReferralService(ReferralCodeRepository codeRepo, ReferralRecordRepository recordRepo) {
+    public ReferralService(ReferralCodeRepository codeRepo, ReferralRecordRepository recordRepo,
+                           com.hostlify.module.hosteller.repository.HostellerProfileRepository profileRepo) {
         this.codeRepo = codeRepo;
         this.recordRepo = recordRepo;
+        this.profileRepo = profileRepo;
     }
 
     /**
@@ -29,10 +32,15 @@ public class ReferralService {
      */
     @Transactional
     public ReferralCode getOrCreateCode(Long hostellerId, String firstName) {
+        if (hostellerId == null) {
+            throw new AppException("Hosteller profile not found", HttpStatus.NOT_FOUND);
+        }
         return codeRepo.findByHostellerId(hostellerId).orElseGet(() -> {
+            // JWTs carry no name, so prefer the profile's first name over the "HOST" fallback
+            String name = profileRepo.findById(hostellerId).map(p -> p.getFirstName()).orElse(firstName);
             ReferralCode rc = new ReferralCode();
             rc.setHostellerId(hostellerId);
-            rc.setCode(generateUniqueCode(firstName));
+            rc.setCode(generateUniqueCode(name));
             return codeRepo.save(rc);
         });
     }
@@ -51,6 +59,9 @@ public class ReferralService {
 
         if (rc.getHostellerId().equals(referredHostellerId)) {
             throw new AppException("You cannot use your own referral code", HttpStatus.BAD_REQUEST);
+        }
+        if (recordRepo.existsByReferredId(referredHostellerId)) {
+            throw new AppException("A referral code has already been applied to this account", HttpStatus.CONFLICT);
         }
 
         ReferralRecord record = new ReferralRecord();
@@ -71,7 +82,10 @@ public class ReferralService {
     }
 
     public List<ReferralRecord> getMyReferrals(Long hostellerId) {
-        return recordRepo.findByReferrerId(hostellerId);
+        List<ReferralRecord> list = recordRepo.findByReferrerId(hostellerId);
+        list.forEach(r -> profileRepo.findById(r.getReferredId()).ifPresent(p ->
+                r.setReferredName((p.getFirstName() + " " + (p.getLastName() != null ? p.getLastName() : "")).trim())));
+        return list;
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────

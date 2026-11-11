@@ -1,0 +1,52 @@
+# Local dev stack for the Hostlify API.
+#   docker compose up -d db        -> PostgreSQL only (run the API from your IDE)
+#   docker compose up -d           -> PostgreSQL + API (built with JDK 21 in a container)
+# Postgres is published on host port 5433 to avoid clashing with a native install on 5432.
+name: hostlify
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: hostlify-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: hostlify-db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      TZ: Asia/Kolkata
+    ports:
+      - "5433:5432"
+    volumes:
+      - hostlify-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d hostlify-db"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    image: maven:3.9-eclipse-temurin-21
+    container_name: hostlify-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    working_dir: /app
+    command: mvn -q -B spring-boot:run
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/hostlify-db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      DB_HOST: db
+      DB_PORT: "5432"
+      TZ: Asia/Kolkata
+    ports:
+      - "8090:8090"
+    volumes:
+      - ./hostlify-api:/app
+      - hostlify-m2:/root/.m2
+
+volumes:
+  hostlify-pgdata:
+  hostlify-m2:
