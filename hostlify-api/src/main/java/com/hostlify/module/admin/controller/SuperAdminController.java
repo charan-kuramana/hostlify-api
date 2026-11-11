@@ -46,6 +46,16 @@ public class SuperAdminController {
         return ApiResponse.ok(adminService.getAuditLogsByHostel(hostelId, pageable));
     }
 
+    @GetMapping("/audit/owner/{ownerId}")
+    @Operation(summary = "SuperAdmin: audit trail of super-admin actions on an owner (paginated)")
+    public ApiResponse<Page<AuditLog>> getAuditByOwner(
+            @PathVariable Long ownerId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        requireSuperAdmin();
+        return ApiResponse.ok(adminService.getAuditLogsByOwner(ownerId, PageRequest.of(page, size)));
+    }
+
     @GetMapping("/audit/actor/{actorUserId}")
     @Operation(summary = "SuperAdmin: get audit logs by actor user (paginated)")
     public ApiResponse<Page<AuditLog>> getAuditByActor(
@@ -67,17 +77,18 @@ public class SuperAdminController {
     }
 
     @PostMapping("/subscription")
-    @Operation(summary = "SuperAdmin: create or update a subscription plan for an owner")
+    @Operation(summary = "SuperAdmin: create or update a subscription plan for an owner (limits default from the plan)")
     public ApiResponse<Subscription> upsertSubscription(@RequestBody Map<String, Object> body) {
-        requireSuperAdmin();
-        Long ownerId = ((Number) body.get("ownerId")).longValue();
-        String planName = (String) body.get("planName");
-        int maxHostels = ((Number) body.getOrDefault("maxHostels", 1)).intValue();
-        int maxBeds = ((Number) body.getOrDefault("maxBeds", 50)).intValue();
-        BigDecimal priceMonthly = new BigDecimal(body.getOrDefault("priceMonthly", "0").toString());
+        UserPrincipal p = getPrincipal();
+        requireSuperAdmin(p);
+        Long ownerId = requireLong(body, "ownerId");
+        String planName = body.get("planName") != null ? body.get("planName").toString() : null;
+        Integer maxHostels = body.get("maxHostels") instanceof Number n ? n.intValue() : null;
+        Integer maxBeds = body.get("maxBeds") instanceof Number n ? n.intValue() : null;
+        BigDecimal priceMonthly = body.get("priceMonthly") != null ? new BigDecimal(body.get("priceMonthly").toString()) : null;
 
         return ApiResponse.ok(
-                adminService.upsertSubscription(ownerId, planName, maxHostels, maxBeds, priceMonthly),
+                adminService.upsertSubscription(ownerId, planName, maxHostels, maxBeds, priceMonthly, p.getUserId()),
                 "Subscription saved");
     }
 
@@ -96,7 +107,7 @@ public class SuperAdminController {
         UserPrincipal p = getPrincipal();
         requireSuperAdmin(p);
 
-        Long ownerId = ((Number) body.get("ownerId")).longValue();
+        Long ownerId = requireLong(body, "ownerId");
         String flagName = (String) body.get("flagName");
         boolean enabled = Boolean.parseBoolean(body.getOrDefault("enabled", "true").toString());
         String reason = (String) body.getOrDefault("reason", null);
@@ -116,53 +127,56 @@ public class SuperAdminController {
     // ── Owner Management ──────────────────────────────────────────────────────
 
     @GetMapping("/owners")
-    @Operation(summary = "SuperAdmin: list all hostel owners (paginated)")
-    public ApiResponse<Page<HostelOwner>> getOwners(
+    @Operation(summary = "SuperAdmin: list all hostel owners with hostel/member/revenue stats (paginated)")
+    public ApiResponse<Page<Map<String, Object>>> getOwners(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         requireSuperAdmin();
-        return ApiResponse.ok(adminService.getOwners(PageRequest.of(page, size)));
+        return ApiResponse.ok(adminService.getOwnerViews(PageRequest.of(page, size)));
     }
 
     @GetMapping("/owners/{id}")
-    @Operation(summary = "SuperAdmin: get owner by ID")
-    public ApiResponse<HostelOwner> getOwnerById(@PathVariable Long id) {
+    @Operation(summary = "SuperAdmin: get owner by ID (with hostel/member/revenue stats)")
+    public ApiResponse<Map<String, Object>> getOwnerById(@PathVariable Long id) {
         requireSuperAdmin();
-        return ApiResponse.ok(adminService.getOwnerById(id));
+        return ApiResponse.ok(adminService.getOwnerView(id));
     }
 
     @PostMapping("/owners")
-    @Operation(summary = "SuperAdmin: create a new hostel owner account")
+    @Operation(summary = "SuperAdmin: create a new hostel owner account (optionally with their first hostel)")
     public ApiResponse<HostelOwner> createOwner(@RequestBody Map<String, Object> body) {
-        requireSuperAdmin();
-        String email = (String) body.get("email");
-        String password = (String) body.get("password");
-        String businessName = (String) body.get("businessName");
-        String ownerName = (String) body.get("ownerName");
-        String mobile = (String) body.get("mobile");
-        String planName = (String) body.getOrDefault("planName", "FREE");
-        return ApiResponse.ok(
-                adminService.createOwner(email, password, businessName, ownerName, mobile, planName),
-                "Owner account created");
+        UserPrincipal p = getPrincipal();
+        requireSuperAdmin(p);
+        return ApiResponse.ok(adminService.createOwner(body, p.getUserId()), "Owner account created");
     }
 
     @PutMapping("/owners/{id}/suspend")
     @Operation(summary = "SuperAdmin: suspend an owner and their auth account")
     public ApiResponse<HostelOwner> suspendOwner(@PathVariable Long id) {
-        requireSuperAdmin();
-        return ApiResponse.ok(adminService.suspendOwner(id), "Owner suspended");
+        UserPrincipal p = getPrincipal();
+        requireSuperAdmin(p);
+        return ApiResponse.ok(adminService.setOwnerStatus(id, "SUSPENDED", p.getUserId()), "Owner suspended");
+    }
+
+    @PutMapping("/owners/{id}/activate")
+    @Operation(summary = "SuperAdmin: re-activate a suspended owner and their auth account")
+    public ApiResponse<HostelOwner> activateOwner(@PathVariable Long id) {
+        UserPrincipal p = getPrincipal();
+        requireSuperAdmin(p);
+        return ApiResponse.ok(adminService.setOwnerStatus(id, "ACTIVE", p.getUserId()), "Owner activated");
     }
 
     @PutMapping("/owners/{id}/reset-password")
     @Operation(summary = "SuperAdmin: reset owner's password")
     public ApiResponse<Void> resetOwnerPassword(@PathVariable Long id,
                                                   @RequestBody Map<String, String> body) {
-        requireSuperAdmin();
+        UserPrincipal p = getPrincipal();
+        requireSuperAdmin(p);
         String newPassword = body.get("newPassword");
         if (newPassword == null || newPassword.isBlank()) {
             throw new AppException("newPassword is required", HttpStatus.BAD_REQUEST);
         }
-        adminService.resetOwnerPassword(id, newPassword);
+        adminService.resetOwnerPassword(id, newPassword, p.getUserId());
         return ApiResponse.ok(null, "Password reset successfully");
     }
 
@@ -176,22 +190,61 @@ public class SuperAdminController {
     }
 
     @GetMapping("/reports/revenue")
-    @Operation(summary = "SuperAdmin: revenue report for a given month/year")
+    @Operation(summary = "SuperAdmin: revenue report for a given month/year (defaults to the current month)")
     public ApiResponse<Map<String, Object>> getRevenueReport(
-            @RequestParam int month,
-            @RequestParam int year) {
+            @RequestParam(required = false) Integer month,
+            @RequestParam(required = false) Integer year) {
         requireSuperAdmin();
-        return ApiResponse.ok(adminService.getRevenueReport(month, year));
+        java.time.YearMonth now = java.time.YearMonth.now();
+        return ApiResponse.ok(adminService.getRevenueReport(
+                month != null ? month : now.getMonthValue(),
+                year != null ? year : now.getYear()));
+    }
+
+    @GetMapping("/complaints")
+    @Operation(summary = "SuperAdmin: platform-wide complaint monitor")
+    public ApiResponse<List<Map<String, Object>>> getAllComplaints() {
+        requireSuperAdmin();
+        return ApiResponse.ok(adminService.getAllComplaints());
     }
 
     @GetMapping("/reports/occupancy")
-    @Operation(summary = "SuperAdmin: occupancy report across all hostels")
+    @Operation(summary = "SuperAdmin: occupancy report across all hostels (totals + per-hostel rows)")
     public ApiResponse<Map<String, Object>> getOccupancyReport() {
         requireSuperAdmin();
         return ApiResponse.ok(adminService.getOccupancyReport());
     }
 
+    // ── Own account ───────────────────────────────────────────────────────────
+
+    @GetMapping("/account")
+    @Operation(summary = "SuperAdmin: own account details")
+    public ApiResponse<Map<String, Object>> getAccount() {
+        UserPrincipal p = getPrincipal();
+        requireSuperAdmin(p);
+        return ApiResponse.ok(adminService.getAccount(p.getUserId()));
+    }
+
+    @PutMapping("/account/password")
+    @Operation(summary = "SuperAdmin: change own password")
+    public ApiResponse<Void> changePassword(@RequestBody Map<String, String> body) {
+        UserPrincipal p = getPrincipal();
+        requireSuperAdmin(p);
+        adminService.changeOwnPassword(p.getUserId(), body.get("currentPassword"), body.get("newPassword"));
+        return ApiResponse.ok(null, "Password updated");
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────
+
+    private Long requireLong(Map<String, Object> body, String key) {
+        Object v = body.get(key);
+        if (v instanceof Number n) return n.longValue();
+        try {
+            return Long.parseLong(String.valueOf(v));
+        } catch (NumberFormatException e) {
+            throw new AppException(key + " is required", HttpStatus.BAD_REQUEST);
+        }
+    }
 
     private void requireSuperAdmin() {
         requireSuperAdmin(getPrincipal());
