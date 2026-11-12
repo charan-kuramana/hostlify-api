@@ -78,7 +78,17 @@ public class HostellerService {
         if (req.getPincode() != null)          existing.setPincode(req.getPincode());
         if (req.getIdProofType() != null)      existing.setIdProofType(req.getIdProofType());
         if (req.getIdProofNumber() != null)    existing.setIdProofNumber(req.getIdProofNumber());
+        // Aadhaar rules: never keep the full Aadhaar number, only the last 4 digits
+        existing.setIdProofNumber(maskIfAadhaar(existing.getIdProofType(), existing.getIdProofNumber()));
         return profileRepo.save(existing);
+    }
+
+    /** "1234 5678 9012" → "XXXX-XXXX-9012" when the ID type is Aadhaar; other IDs unchanged. */
+    public static String maskIfAadhaar(String type, String number) {
+        if (number == null || !"AADHAAR".equalsIgnoreCase(type)) return number;
+        String digits = number.replaceAll("\\D", "");
+        if (digits.length() < 4) return number.startsWith("XXXX") ? number : null;
+        return "XXXX-XXXX-" + digits.substring(digits.length() - 4);
     }
 
     // Indian mobile: 10 digits starting 6-9 · PIN code: 6 digits, not starting with 0

@@ -102,6 +102,52 @@
             <version>12.26.0</version>
         </dependency>
 
+        <!-- ===== Email (SMTP: Brevo free tier / Gmail / any provider) ===== -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+
+        <!-- ===== PDF receipts (open source, LGPL/MPL) ===== -->
+        <dependency>
+            <groupId>com.github.librepdf</groupId>
+            <artifactId>openpdf</artifactId>
+            <version>1.3.43</version>
+        </dependency>
+
+        <!-- ===== Browser push notifications (VAPID, free) ===== -->
+        <dependency>
+            <groupId>nl.martijndwars</groupId>
+            <artifactId>web-push</artifactId>
+            <version>5.1.1</version>
+        </dependency>
+        <dependency>
+            <!-- crypto provider web-push needs (only runtime-scoped there; we register it ourselves) -->
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcprov-jdk15on</artifactId>
+            <version>1.70</version>
+        </dependency>
+
+        <!-- ===== Aadhaar Secure QR verification (all open source, offline) ===== -->
+        <dependency>
+            <!-- QR decoding from photos/screenshots -->
+            <groupId>com.google.zxing</groupId>
+            <artifactId>javase</artifactId>
+            <version>3.5.3</version>
+        </dependency>
+        <dependency>
+            <!-- render password-protected e-Aadhaar PDFs to find the QR -->
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox</artifactId>
+            <version>3.0.3</version>
+        </dependency>
+        <dependency>
+            <!-- the photo inside the Aadhaar QR is JPEG 2000; browsers can't show it, so we convert to JPEG -->
+            <groupId>com.github.jai-imageio</groupId>
+            <artifactId>jai-imageio-jpeg2000</artifactId>
+            <version>1.4.0</version>
+        </dependency>
+
         <!-- ===== Lombok ===== -->
         <dependency>
             <groupId>org.projectlombok</groupId>

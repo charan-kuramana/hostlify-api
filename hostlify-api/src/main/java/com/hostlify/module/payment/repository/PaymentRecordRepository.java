@@ -13,4 +13,6 @@ public interface PaymentRecordRepository extends JpaRepository<PaymentRecord, Lo
     List<PaymentRecord> findByDueId(Long dueId);
     Optional<PaymentRecord> findByRazorpayPaymentId(String razorpayPaymentId);
     List<PaymentRecord> findByHostelIdOrderByCreatedAtDesc(Long hostelId);
+    List<PaymentRecord> findByHostelIdAndStatusOrderByCreatedAtDesc(Long hostelId, String status);
+    List<PaymentRecord> findByDueIdAndStatus(Long dueId, String status);
 }

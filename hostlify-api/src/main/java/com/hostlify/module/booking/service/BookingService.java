@@ -125,7 +125,7 @@ public class BookingService {
         LocalDate checkin = saved.getCheckinDate();
         int month = checkin.getMonthValue();
         int year = checkin.getYear();
-        boolean dueExists = dueRepo.findByHostellerIdAndPeriodYearAndPeriodMonth(profile.getId(), year, month).isPresent();
+        boolean dueExists = dueRepo.findRentDue(profile.getId(), year, month).isPresent();
         if (!dueExists) {
             PaymentDue due = new PaymentDue();
             due.setHostellerId(profile.getId());

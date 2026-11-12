@@ -69,4 +69,23 @@ public class Hostel extends BaseEntity {
 
     @Column(name = "online_payment_enabled", nullable = false)
     private boolean onlinePaymentEnabled = true;
+
+    /** Public page URL part, e.g. "bliss-pg-vijayawada-1". */
+    @Column(nullable = false, length = 160, unique = true)
+    private String slug;
+
+    /** Owner's switch: show this hostel on the public listing pages. */
+    @Column(name = "listing_enabled", nullable = false)
+    private boolean listingEnabled = false;
+
+    /** New hostels get a slug from name + city; the id suffix is added once the id exists. */
+    @PrePersist
+    void defaultSlug() {
+        if (slug == null || slug.isBlank()) slug = slugify(name + "-" + city) + "-" + java.util.UUID.randomUUID().toString().substring(0, 6);
+    }
+
+    public static String slugify(String s) {
+        String out = (s == null ? "" : s).toLowerCase().replaceAll("[^a-z0-9]+", "-").replaceAll("(^-|-$)", "");
+        return out.length() > 140 ? out.substring(0, 140) : out;
+    }
 }

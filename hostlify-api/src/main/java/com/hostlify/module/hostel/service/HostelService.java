@@ -91,7 +91,19 @@ public class HostelService {
         if (body.containsKey("locality")) existing.setLandmark((String) body.get("locality"));
         if (body.containsKey("contact")) existing.setContactPhone((String) body.get("contact"));
         if (body.containsKey("contactPhone")) existing.setContactPhone((String) body.get("contactPhone"));
-        if (body.containsKey("about")) existing.setAbout((String) body.get("about"));
+        if (body.containsKey("about")) {
+            String about = body.get("about") == null ? null : body.get("about").toString().trim();
+            if (about != null && about.length() > 3000) throw new AppException("About must be at most 3000 characters", HttpStatus.BAD_REQUEST);
+            existing.setAbout(about == null || about.isEmpty() ? null : about);
+        }
+        // Map location for the public page (both or neither)
+        if (body.containsKey("latitude") || body.containsKey("longitude")) {
+            BigDecimal lat = coord(body.get("latitude"), 90, "Latitude");
+            BigDecimal lng = coord(body.get("longitude"), 180, "Longitude");
+            if ((lat == null) != (lng == null)) throw new AppException("Enter both latitude and longitude", HttpStatus.BAD_REQUEST);
+            existing.setLatitude(lat);
+            existing.setLongitude(lng);
+        }
         if (body.containsKey("defaultRent") && body.get("defaultRent") != null) {
             existing.setDefaultRent(new BigDecimal(body.get("defaultRent").toString()));
         }
@@ -105,6 +117,17 @@ public class HostelService {
         if (existing.getPincode() == null || existing.getPincode().isBlank()) existing.setPincode("000000");
         return hostelRepo.save(existing);
     }
+    private static BigDecimal coord(Object v, int limit, String label) {
+        if (v == null || v.toString().isBlank()) return null;
+        try {
+            BigDecimal b = new BigDecimal(v.toString().trim()).setScale(7, java.math.RoundingMode.HALF_UP);
+            if (b.abs().compareTo(BigDecimal.valueOf(limit)) > 0) throw new AppException(label + " is out of range", HttpStatus.BAD_REQUEST);
+            return b;
+        } catch (NumberFormatException e) {
+            throw new AppException(label + " must be a number", HttpStatus.BAD_REQUEST);
+        }
+    }
+
     /** Server-side checks for hostel profile edits; only fields present in the request are checked. */
     private void validateHostelUpdate(Map<String, Object> body) {
         for (String key : List.of("name", "hostelName", "city")) {

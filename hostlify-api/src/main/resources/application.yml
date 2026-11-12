@@ -21,8 +21,24 @@ spring:
     enabled: true
     locations: classpath:db/migration
     baseline-on-migrate: false
+  # SMTP email. Free option: Brevo (300/day) -> host smtp-relay.brevo.com, port 587,
+  # username = your Brevo SMTP login, password = a Brevo SMTP key. Leave MAIL_HOST empty to disable email.
+  mail:
+    host: ${MAIL_HOST:}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+      mail.smtp.connectiontimeout: 10000
+      mail.smtp.timeout: 10000
+      mail.smtp.writetimeout: 10000
 
 management:
+  health:
+    mail:
+      enabled: false  # an unconfigured/slow SMTP server must not mark the API unhealthy
   endpoints:
     web:
       exposure:
@@ -36,8 +52,20 @@ app:
     superadmin-expiry-ms: 28800000
     refresh-expiry-ms: 2592000000
   notification:
-    skip-email: false
+    skip-email: ${SKIP_EMAIL:false}
     skip-sms: false
+  mail:
+    # Must be a sender address verified in your SMTP provider (Brevo: Senders & IP)
+    from: ${MAIL_FROM:Hostlify <no-reply@hostlify.in>}
+  # Aadhaar Secure QR verification: folder holding UIDAI's public certificate(s) (.cer/.crt/.pem).
+  # Files are picked up automatically, no restart needed. See aadhaar-certs/README.md.
+  aadhaar:
+    cert-dir: ${APP_AADHAAR_CERT_DIR:./aadhaar-certs}
+  # Browser push (free). Generate once: npx web-push generate-vapid-keys
+  push:
+    vapid-public-key: ${APP_PUSH_VAPID_PUBLIC_KEY:}
+    vapid-private-key: ${APP_PUSH_VAPID_PRIVATE_KEY:}
+    subject: ${APP_PUSH_SUBJECT:mailto:support@hostlify.in}
   razorpay:
     key-id: ${RAZORPAY_KEY_ID:test_key}
     key-secret: ${RAZORPAY_KEY_SECRET:test_secret}

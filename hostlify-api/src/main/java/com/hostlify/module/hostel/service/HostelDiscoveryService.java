@@ -112,7 +112,7 @@ public class HostelDiscoveryService {
         return detail;
     }
 
-    private Map<String, Object> buildHostelSummary(Hostel h, Double distanceKm) {
+    public Map<String, Object> buildHostelSummary(Hostel h, Double distanceKm) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("id", h.getId());
         m.put("name", h.getName());
@@ -120,6 +120,7 @@ public class HostelDiscoveryService {
         m.put("city", h.getCity());
         m.put("address", h.getAddress());
         m.put("landmark", h.getLandmark());
+        m.put("slug", h.getSlug());
         if (distanceKm != null) {
             m.put("distanceKm", Math.round(distanceKm * 10.0) / 10.0);
         }

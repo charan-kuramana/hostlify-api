@@ -32,7 +32,7 @@ public class PaymentDue extends BaseEntity {
     @Column(name = "hosteller_id", nullable = false)
     private Long hostellerId;
 
-    @Column(name = "booking_id", nullable = false)
+    @Column(name = "booking_id")
     private Long bookingId;
 
     @Column(name = "hostel_id", nullable = false)
@@ -54,9 +54,45 @@ public class PaymentDue extends BaseEntity {
     @Column(nullable = false, length = 20)
     private String status = "UNPAID";
 
+    /** RENT | DEPOSIT | MESS | ELECTRICITY | FINE | LATE_FEE | OTHER */
+    @Column(name = "due_type", nullable = false, length = 20)
+    private String dueType = TYPE_RENT;
+
+    /** Free text shown to the resident, e.g. "Electricity Oct: 82 units". */
+    @Column(length = 300)
+    private String description;
+
+    /** For LATE_FEE dues: the rent due it was charged on. */
+    @Column(name = "parent_due_id")
+    private Long parentDueId;
+
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    @Column(name = "last_reminder_on")
+    private LocalDate lastReminderOn;
+
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    @Column(name = "reminder_count", nullable = false)
+    private int reminderCount = 0;
+
+    public static final String TYPE_RENT = "RENT";
+    public static final String TYPE_LATE_FEE = "LATE_FEE";
+    public static final java.util.Set<String> TYPES =
+            java.util.Set.of("RENT", "DEPOSIT", "MESS", "ELECTRICITY", "FINE", "LATE_FEE", "OTHER");
+    /** Types staff may add by hand (rent comes from generation, late fee from the scheduler). */
+    public static final java.util.Set<String> MANUAL_TYPES =
+            java.util.Set.of("DEPOSIT", "MESS", "ELECTRICITY", "FINE", "OTHER");
+
+    public boolean isOpen() {
+        return "UNPAID".equals(status) || "PARTIAL".equals(status) || "OVERDUE".equals(status);
+    }
+
     // Transient enrichment fields (populated by service, not persisted)
     @Transient
     private String hostellerName;
+
+    /** Resident mobile, for staff WhatsApp one-tap reminders. */
+    @Transient
+    private String hostellerMobile;
 
     @Transient
     private String roomNumber;
@@ -64,4 +100,8 @@ public class PaymentDue extends BaseEntity {
     /** Sum of successful payments recorded against this due (staff views; partial payments). */
     @Transient
     private BigDecimal paidAmount;
+
+    /** Resident's UPI payments waiting for staff confirmation. */
+    @Transient
+    private BigDecimal pendingVerificationAmount;
 }
