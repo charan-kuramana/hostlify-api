@@ -84,7 +84,7 @@ public class ComplianceController {
         HostelAccess.requireStaffHostel(hostelId);
         AgreementTemplate t = agreements.template(hostelId);
         return ApiResponse.ok(Map.of("title", t.getTitle(), "body", t.getBody(), "noticeDays", t.getNoticeDays(),
-                "placeholders", AgreementService.PLACEHOLDERS, "isDefault", t.getId() == null));
+                "placeholders", AgreementService.PLACEHOLDERS, "isDefault", AgreementService.isStandard(t)));
     }
 
     @PutMapping("/agreement-template/hostel/{hostelId}")

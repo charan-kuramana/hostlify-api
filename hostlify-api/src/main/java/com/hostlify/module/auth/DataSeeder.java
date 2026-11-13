@@ -608,7 +608,10 @@ public class DataSeeder implements CommandLineRunner {
                 hostelId, b.owner().getId(), ownerUserId);
         assignStaff(newUser("admin.bliss@test.com", "9848012347", "HOSTEL_STAFF", "ADMIN", "ACTIVE"),
                 hostelId, b.owner().getId(), ownerUserId);
-        System.out.println("[DEV] Seeded Bliss PG staff: manager.bliss@test.com (MANAGER), admin.bliss@test.com (ADMIN)");
+        // Below-manager account: day-to-day work only (no finance, templates, voiding or finalizing)
+        assignStaff(newUser("supervisor.bliss@test.com", "9848012348", "HOSTEL_STAFF", "SUPERVISOR", "ACTIVE"),
+                hostelId, b.owner().getId(), ownerUserId);
+        System.out.println("[DEV] Seeded Bliss PG staff: manager.bliss@test.com (MANAGER), admin.bliss@test.com (ADMIN), supervisor.bliss@test.com (SUPERVISOR)");
 
         HostellerProfile sai = res.get(0), lakshmi = res.get(1), naveen = res.get(2),
                 harika = res.get(3), vamsi = res.get(4), teja = res.get(5);

@@ -131,6 +131,13 @@ public class AgreementService {
         return templateRepo.save(t);
     }
 
+    /** True when the template text matches the standard one (whether or not a row was ever saved). */
+    public static boolean isStandard(AgreementTemplate t) {
+        return DEFAULT_TITLE.equals(t.getTitle() == null ? null : t.getTitle().trim())
+                && DEFAULT_BODY.trim().equals(t.getBody() == null ? null : t.getBody().trim())
+                && t.getNoticeDays() == 30;
+    }
+
     @Transactional
     public AgreementTemplate resetTemplate(Long hostelId, Long userId) {
         return saveTemplate(hostelId, DEFAULT_TITLE, DEFAULT_BODY, 30, userId);

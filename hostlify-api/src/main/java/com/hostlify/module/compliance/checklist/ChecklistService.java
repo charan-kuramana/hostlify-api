@@ -176,7 +176,13 @@ public class ChecklistService {
         c.setStatus(r);
         c.setResidentResponse(r);
         c.setResidentComment(str(comment, 1000));
-        c.setRespondedAt(LocalDateTime.now());
+        LocalDateTime now = LocalDateTime.now();
+        if (r.equals("DISPUTED")) {
+            String entry = now.format(java.time.format.DateTimeFormatter.ofPattern("dd MMM yyyy, hh:mm a"))
+                    + ": " + str(comment, 1000).replace('\n', ' ');
+            c.setConcernHistory(c.getConcernHistory() == null ? entry : c.getConcernHistory() + "\n" + entry);
+        }
+        c.setRespondedAt(now);
         c.setRespondedIp(ip == null ? null : ip.length() > 64 ? ip.substring(0, 64) : ip);
         c.setUpdatedAt(LocalDateTime.now());
         return view(repo.save(c));

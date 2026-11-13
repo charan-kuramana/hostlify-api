@@ -91,6 +91,9 @@ public class CompliancePdfService {
             row(m, "Resident response", c.getResidentResponse() == null ? "Pending"
                     : cap(c.getResidentResponse()) + (c.getRespondedAt() != null ? " on " + c.getRespondedAt().format(DT) : "")
                     + (c.getResidentComment() != null ? " - \"" + c.getResidentComment() + "\"" : ""));
+            if (c.getConcernHistory() != null && !c.getConcernHistory().isBlank()) {
+                row(m, "Concerns raised by resident", c.getConcernHistory());
+            }
             doc.add(m);
         });
     }

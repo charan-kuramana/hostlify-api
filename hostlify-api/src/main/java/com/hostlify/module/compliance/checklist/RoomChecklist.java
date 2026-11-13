@@ -63,6 +63,10 @@ public class RoomChecklist {
     @Column(name = "resident_comment", length = 1000)
     private String residentComment;
 
+    /** Every concern the resident raised, one per line ("12 Nov 2026, 06:02 PM: text"); never overwritten. */
+    @Column(name = "concern_history", columnDefinition = "TEXT")
+    private String concernHistory;
+
     @Column(name = "responded_at")
     private LocalDateTime respondedAt;
 

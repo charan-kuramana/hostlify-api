@@ -137,6 +137,13 @@ public class PaymentService {
     @Transactional
     public List<PaymentDue> createCharges(Long hostelId, Long hostellerId, String dueType, BigDecimal amount,
                                           String description, LocalDate dueDate) {
+        return createCharges(hostelId, hostellerId, dueType, amount, description, dueDate, true);
+    }
+
+    /** @param notifyResidents false when the caller sends its own notice (e.g. deposit settlement) */
+    @Transactional
+    public List<PaymentDue> createCharges(Long hostelId, Long hostellerId, String dueType, BigDecimal amount,
+                                          String description, LocalDate dueDate, boolean notifyResidents) {
         String type = dueType == null ? "" : dueType.toUpperCase();
         if (!PaymentDue.MANUAL_TYPES.contains(type)) {
             throw new AppException("Charge type must be one of " + PaymentDue.MANUAL_TYPES, HttpStatus.BAD_REQUEST);
@@ -181,6 +188,18 @@ public class PaymentService {
             d.setStatus("UNPAID");
             created.add(dueRepo.save(d));
         }
+        if (notifyResidents) {
+            String label = CHARGE_LABELS.getOrDefault(type, "Charge");
+            String rs = "Rs. " + amount.stripTrailingZeros().toPlainString();
+            String dueOn = due.format(java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy"));
+            for (PaymentDue d : created) {
+                String body = "A new " + label.toLowerCase() + " charge of " + rs + " has been added, due on " + dueOn + "."
+                        + (d.getDescription() != null ? "\nNote: " + d.getDescription() : "")
+                        + "\nYou can pay it from My Dues.";
+                eventPublisher.publishEvent(new com.hostlify.module.compliance.ResidentNoticeEvent(this, d.getHostellerId(),
+                        "CHARGE_ADDED", "New charge: " + label + " " + rs, body, "/app/dues"));
+            }
+        }
         created.forEach(this::enrichDue);
         return created;
     }
@@ -206,6 +225,8 @@ public class PaymentService {
     // ─── Razorpay Order ─────────────────────────────────────────────
 
     private static final long RAZORPAY_TIMEOUT_SECONDS = 10;
+    private static final java.util.Map<String, String> CHARGE_LABELS = java.util.Map.of(
+            "DEPOSIT", "Deposit", "MESS", "Mess", "ELECTRICITY", "Electricity", "FINE", "Fine", "OTHER", "Other");
 
     @Transactional
     public PaymentRazorpayOrder initiateRazorpayPayment(Long authUserId, Long dueId) {

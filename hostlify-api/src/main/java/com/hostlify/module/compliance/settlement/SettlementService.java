@@ -121,7 +121,7 @@ public class SettlementService {
         BigDecimal uncovered = ded.subtract(remaining.max(BigDecimal.ZERO));
         if (uncovered.signum() > 0) {
             paymentService.createCharges(b.getHostelId(), b.getHostellerId(), "OTHER", uncovered,
-                    "Checkout deductions not covered by deposit (settlement #" + s.getId() + ")", DateUtils.todayKolkata());
+                    "Checkout deductions not covered by deposit (settlement #" + s.getId() + ")", DateUtils.todayKolkata(), false);
         }
 
         // Amounts stay as calculated above (before the dues were settled): that's the statement the resident sees
