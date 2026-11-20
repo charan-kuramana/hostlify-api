@@ -79,6 +79,12 @@ public class HostellerProfile extends BaseEntity {
     @Column(name = "hostel_id")
     private Long hostelId;
 
+    @Column(name = "blood_group", length = 5)
+    private String bloodGroup;
+
+    @Column(name = "medical_notes", length = 300)
+    private String medicalNotes;
+
     public String getName() {
         String full = (firstName != null ? firstName : "") + (lastName != null ? " " + lastName : "");
         return full.trim();

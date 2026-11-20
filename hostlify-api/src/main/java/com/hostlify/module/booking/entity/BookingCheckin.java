@@ -66,4 +66,18 @@ public class BookingCheckin extends BaseEntity {
 
     @Column(name = "checkout_reason", columnDefinition = "TEXT")
     private String checkoutReason;
+
+    /** Short stays: the planned last day. */
+    @Column(name = "expected_checkout_date")
+    private LocalDate expectedCheckoutDate;
+
+    /** Cost of stay + rules as shown when the resident booked (JSON) */
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    @Column(name = "terms_json", columnDefinition = "TEXT")
+    private String termsJson;
+
+    /** 1 = staff reminded before the deposit refund deadline, 2 = overdue alerts sent */
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    @Column(name = "deposit_alerts", nullable = false)
+    private short depositAlerts = 0;
 }

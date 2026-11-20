@@ -38,7 +38,9 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(
                     "/api/v1/auth/**",
+                    "/api/v1/public/**",   // public hostel pages, enquiries, sitemap, signed file links
                     "/api/payment/razorpay/webhook",
+                    "/api/payment/gateway/webhook/**", // owners' own gateways; signature checked per gateway
                     "/actuator/**",
                     "/swagger-ui/**",
                     "/swagger-ui.html",

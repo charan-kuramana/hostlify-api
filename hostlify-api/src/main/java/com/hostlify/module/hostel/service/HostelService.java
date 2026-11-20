@@ -16,6 +16,10 @@ import java.util.Map;
 @Service
 public class HostelService {
 
+    /** Plan limits (Section 6): adding beds is checked against the owner's plan. */
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.hostlify.module.platform.PlanService planService;
+
     private final HostelRepository hostelRepo;
     private final HostelOwnerRepository ownerRepo;
     private final FloorRepository floorRepo;
@@ -91,12 +95,31 @@ public class HostelService {
         if (body.containsKey("locality")) existing.setLandmark((String) body.get("locality"));
         if (body.containsKey("contact")) existing.setContactPhone((String) body.get("contact"));
         if (body.containsKey("contactPhone")) existing.setContactPhone((String) body.get("contactPhone"));
-        if (body.containsKey("about")) existing.setAbout((String) body.get("about"));
+        if (body.containsKey("about")) {
+            String about = body.get("about") == null ? null : body.get("about").toString().trim();
+            if (about != null && about.length() > 3000) throw new AppException("About must be at most 3000 characters", HttpStatus.BAD_REQUEST);
+            existing.setAbout(about == null || about.isEmpty() ? null : about);
+        }
+        // Map location for the public page (both or neither)
+        if (body.containsKey("latitude") || body.containsKey("longitude")) {
+            BigDecimal lat = coord(body.get("latitude"), 90, "Latitude");
+            BigDecimal lng = coord(body.get("longitude"), 180, "Longitude");
+            if ((lat == null) != (lng == null)) throw new AppException("Enter both latitude and longitude", HttpStatus.BAD_REQUEST);
+            existing.setLatitude(lat);
+            existing.setLongitude(lng);
+        }
         if (body.containsKey("defaultRent") && body.get("defaultRent") != null) {
             existing.setDefaultRent(new BigDecimal(body.get("defaultRent").toString()));
         }
         if (body.containsKey("onlinePaymentEnabled")) {
             existing.setOnlinePaymentEnabled(Boolean.TRUE.equals(body.get("onlinePaymentEnabled")));
+        }
+        if (body.containsKey("discoveryRadiusKm") && body.get("discoveryRadiusKm") != null) {
+            int km;
+            try { km = (int) Math.round(Double.parseDouble(body.get("discoveryRadiusKm").toString())); }
+            catch (NumberFormatException e) { throw new AppException("Nearby radius must be a number of km", HttpStatus.BAD_REQUEST); }
+            if (km < 1 || km > 50) throw new AppException("Nearby radius must be between 1 and 50 km", HttpStatus.BAD_REQUEST);
+            existing.setDiscoveryRadiusKm(km);
         }
         // Ensure non-null required fields have fallback values to prevent constraint violations
         if (existing.getName() == null || existing.getName().isBlank()) existing.setName("Unnamed Hostel");
@@ -105,6 +128,17 @@ public class HostelService {
         if (existing.getPincode() == null || existing.getPincode().isBlank()) existing.setPincode("000000");
         return hostelRepo.save(existing);
     }
+    private static BigDecimal coord(Object v, int limit, String label) {
+        if (v == null || v.toString().isBlank()) return null;
+        try {
+            BigDecimal b = new BigDecimal(v.toString().trim()).setScale(7, java.math.RoundingMode.HALF_UP);
+            if (b.abs().compareTo(BigDecimal.valueOf(limit)) > 0) throw new AppException(label + " is out of range", HttpStatus.BAD_REQUEST);
+            return b;
+        } catch (NumberFormatException e) {
+            throw new AppException(label + " must be a number", HttpStatus.BAD_REQUEST);
+        }
+    }
+
     /** Server-side checks for hostel profile edits; only fields present in the request are checked. */
     private void validateHostelUpdate(Map<String, Object> body) {
         for (String key : List.of("name", "hostelName", "city")) {
@@ -177,7 +211,10 @@ public class HostelService {
         return bedRepo.findById(id).orElseThrow(() -> new AppException("Bed not found", HttpStatus.NOT_FOUND));
     }
     @Transactional
-    public Bed createBed(Bed bed) { return bedRepo.save(bed); }
+    public Bed createBed(Bed bed) {
+        planService.requireBedCapacity(bed.getHostelId(), 1);
+        return bedRepo.save(bed);
+    }
     @Transactional
     public void deleteBed(Long id) {
         Bed bed = getBed(id);

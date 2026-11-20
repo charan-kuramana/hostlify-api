@@ -57,6 +57,7 @@ public class AuthUserService {
     private final StaffAssignmentRepository staffAssignmentRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final OtpTokenRepository otpTokenRepository;
+    private final com.hostlify.module.notification.service.EmailService emailService;
 
     public AuthUserService(AuthUserRepository userRepository,
                            JwtService jwtService,
@@ -65,7 +66,9 @@ public class AuthUserService {
                            BookingCheckinRepository bookingCheckinRepository,
                            StaffAssignmentRepository staffAssignmentRepository,
                            RefreshTokenRepository refreshTokenRepository,
-                           OtpTokenRepository otpTokenRepository) {
+                           OtpTokenRepository otpTokenRepository,
+                           com.hostlify.module.notification.service.EmailService emailService) {
+        this.emailService = emailService;
         this.userRepository = userRepository;
         this.jwtService = jwtService;
         this.passwordEncoder = passwordEncoder;
@@ -165,7 +168,7 @@ public class AuthUserService {
         AuthUser user = userRepository.findByEmail(email).orElse(null);
         if (user == null) return;
 
-        String otp = String.format("%06d", new Random().nextInt(1000000));
+        String otp = String.format("%06d", new java.security.SecureRandom().nextInt(1000000));
         OtpToken token = new OtpToken();
         token.setUserId(user.getId());
         token.setOtpCode(otp);
@@ -173,8 +176,18 @@ public class AuthUserService {
         token.setExpiresAt(LocalDateTime.now().plusMinutes(OTP_EXPIRY_MINUTES));
         otpTokenRepository.save(token);
 
-        // In dev, OTP would be logged; in prod, sent via email
-        System.out.println("[DEV] OTP for " + email + ": " + otp);
+        if (emailService.isEnabled()) {
+            try {
+                emailService.sendEmail(email, "Your Hostlify password reset code: " + otp,
+                        "Your code to reset your Hostlify password is " + otp + ".\n\nIt expires in " + OTP_EXPIRY_MINUTES
+                                + " minutes. If you didn't ask for this, you can ignore this email.");
+            } catch (Exception e) {
+                org.slf4j.LoggerFactory.getLogger(AuthUserService.class).error("Password reset email failed: {}", e.getMessage());
+            }
+        } else {
+            // Dev only (email not configured): the code is in the server log
+            System.out.println("[DEV] OTP for " + email + ": " + otp);
+        }
     }
 
     // noRollbackFor: burning an OTP after too many wrong guesses must be persisted
@@ -262,14 +275,17 @@ public class AuthUserService {
         if ("HOSTELLER".equals(user.getRole())) {
             HostellerProfile profile = hostellerProfileRepository.findByAuthUserId(user.getId()).orElse(null);
             if (profile != null) {
-                claims.put("hostelId", profile.getHostelId());
-                claims.put("hostellerProfileId", profile.getId());
                 Long bookingId = bookingCheckinRepository
                         .findFirstByHostellerIdAndStatus(profile.getId(), "ACTIVE")
                         .map(b -> b.getId())
                         .orElse(null);
+                // Hostel access (notices, menu, services …) only while actually staying there; a resident
+                // who checked out keeps their login for receipts and the next booking, not the old hostel's data.
+                Long stayHostelId = bookingId != null ? profile.getHostelId() : null;
+                claims.put("hostelId", stayHostelId);
+                claims.put("hostellerProfileId", profile.getId());
                 claims.put("bookingId", bookingId);
-                response.setHostelId(profile.getHostelId());
+                response.setHostelId(stayHostelId);
                 response.setHostellerProfileId(profile.getId());
                 response.setBookingId(bookingId);
             }

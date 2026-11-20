@@ -61,7 +61,23 @@ public class PaymentRecord extends BaseEntity {
     @Column(name = "payment_date")
     private LocalDate paymentDate;
 
-    /** SUCCESS | FAILED | PENDING | REFUNDED */
-    @Column(nullable = false, length = 20)
+    /** SUCCESS | FAILED | PENDING_VERIFICATION (resident's UPI claim) | REJECTED | REFUNDED */
+    @Column(nullable = false, length = 30)
     private String status = "SUCCESS";
+
+    /** Staff user who confirmed/rejected a resident's UPI claim. */
+    @Column(name = "verified_by")
+    private Long verifiedBy;
+
+    @Column(name = "verified_at")
+    private java.time.LocalDateTime verifiedAt;
+
+    public static final String STATUS_SUCCESS = "SUCCESS";
+    public static final String STATUS_PENDING_VERIFICATION = "PENDING_VERIFICATION";
+    public static final String STATUS_REJECTED = "REJECTED";
+
+    /** Counts toward the due: legacy rows may have a null status. */
+    public boolean isSuccessful() {
+        return status == null || STATUS_SUCCESS.equals(status);
+    }
 }

@@ -34,6 +34,16 @@ public class HostelBookingSetting {
     @Column(name = "geolocation_radius_km", nullable = false, precision = 5, scale = 2)
     private BigDecimal geolocationRadiusKm = new BigDecimal("10.00");
 
+    /** Owner's choice: allow stays of a few days / weeks, billed by day. */
+    @Column(name = "short_stay_enabled", nullable = false)
+    private boolean shortStayEnabled = false;
+
+    @Column(name = "short_stay_min_days", nullable = false)
+    private int shortStayMinDays = 1;
+
+    @Column(name = "short_stay_max_days", nullable = false)
+    private int shortStayMaxDays = 30;
+
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;
 

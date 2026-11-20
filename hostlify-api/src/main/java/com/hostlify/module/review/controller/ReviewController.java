@@ -36,6 +36,9 @@ public class ReviewController {
         return ApiResponse.ok(reviewService.getReviewSummary(hostelId));
     }
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.hostlify.module.booking.repository.BookingCheckinRepository bookingRepo;
+
     @PostMapping
     @PreAuthorize("hasRole('HOSTELLER')")
     @Operation(summary = "Hosteller: submit a review for their hostel")
@@ -45,6 +48,14 @@ public class ReviewController {
         String reviewText = (String) body.get("reviewText");
         Long hostelId = p.getHostelId();
         Long bookingId = p.getBookingId();
+        // Reviewing a past stay (asked for after check-out): the booking must be the resident's own
+        if (body.get("bookingId") != null) {
+            Long requested = Long.valueOf(String.valueOf(body.get("bookingId")));
+            var b = bookingRepo.findById(requested).orElseThrow(() -> new AppException("Stay not found", HttpStatus.NOT_FOUND));
+            if (!java.util.Objects.equals(b.getHostellerId(), p.getHostellerProfileId())) throw new AppException("Stay not found", HttpStatus.NOT_FOUND);
+            bookingId = b.getId();
+            hostelId = b.getHostelId();
+        }
 
         if (hostelId == null || bookingId == null) {
             throw new AppException("Active booking required to submit a review", HttpStatus.BAD_REQUEST);

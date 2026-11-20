@@ -154,6 +154,33 @@ public class ComplaintController {
         return ApiResponse.ok(complaintService.updateComplaintStatus(id, status, resolvedBy, resolution));
     }
 
+    @PutMapping("/{id}/rating")
+    @PreAuthorize("hasRole('HOSTELLER')")
+    public ApiResponse<ComplaintRecord> rate(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        UserPrincipal p = getPrincipal();
+        if (!(body.get("rating") instanceof Number n)) {
+            throw new com.hostlify.shared.exception.AppException("Rating is required", org.springframework.http.HttpStatus.BAD_REQUEST);
+        }
+        return ApiResponse.ok(complaintService.rate(id, p == null ? null : p.getHostellerProfileId(), n.intValue(),
+                (String) body.get("feedback")), "Thanks for your feedback");
+    }
+
+    @GetMapping("/sla/hostel/{hostelId}")
+    @PreAuthorize("hasRole('HOSTEL_STAFF')")
+    public ApiResponse<Map<String, Object>> sla(@PathVariable Long hostelId) {
+        HostelAccess.requireStaffHostel(hostelId);
+        return ApiResponse.ok(complaintService.slaOverview(hostelId));
+    }
+
+    @PutMapping("/sla/hostel/{hostelId}")
+    @PreAuthorize("hasRole('HOSTEL_STAFF')")
+    public ApiResponse<Map<String, Object>> saveSla(@PathVariable Long hostelId, @RequestBody Map<String, Object> targets) {
+        HostelAccess.requireStaffHostel(hostelId);
+        HostelAccess.requireSubRole("OWNER", "ADMIN", "MANAGER");
+        complaintService.saveTargets(hostelId, targets);
+        return ApiResponse.ok(complaintService.slaOverview(hostelId), "Targets saved. New complaints use them.");
+    }
+
     @GetMapping("/maintenance/hostel/{hostelId}")
     @PreAuthorize("hasRole('HOSTEL_STAFF')")
     public ApiResponse<List<ComplaintMaintenance>> getMaintenance(@PathVariable Long hostelId) {

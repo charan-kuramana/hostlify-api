@@ -50,6 +50,26 @@ public class BookingRequest extends BaseEntity {
     @Column(name = "preference_notes", columnDefinition = "TEXT")
     private String preferenceNotes;
 
+    /** MONTHLY | SHORT */
+    @Column(name = "stay_type", nullable = false, length = 10)
+    private String stayType = "MONTHLY";
+
+    /** Planned check-out for a short stay. */
+    @Column(name = "check_out_date")
+    private java.time.LocalDate checkOutDate;
+
+    /** Short stay total shown to the resident when they booked. */
+    @Column(name = "quoted_amount", precision = 12, scale = 2)
+    private java.math.BigDecimal quotedAmount;
+
+    /** Cost of stay + rules the resident accepted when requesting (JSON) */
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    @Column(name = "terms_json", columnDefinition = "TEXT")
+    private String termsJson;
+
+    @Column(name = "terms_accepted_at")
+    private LocalDateTime termsAcceptedAt;
+
     @Column(nullable = false, length = 30)
     private String status = "PENDING_APPROVAL";
 

@@ -9,6 +9,7 @@ import java.util.List;
 @Repository
 public interface HostelRepository extends JpaRepository<Hostel, Long> {
     List<Hostel> findByOwnerId(Long ownerId);
+    java.util.Optional<Hostel> findBySlug(String slug);
     List<Hostel> findByCityAndIsDeletedFalse(String city);
     boolean existsByName(String name);
 }

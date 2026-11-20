@@ -23,6 +23,7 @@ public interface BedRepository extends JpaRepository<Bed, Long> {
     Optional<Bed> findByIdForUpdate(@Param("bedId") Long bedId);
 
     long countByHostelIdAndStatus(Long hostelId, String status);
+    long countByHostelId(Long hostelId);
     long countByRoomIdAndStatus(Long roomId, String status);
 
     /** Count beds on a specific floor via JOIN through hostel_rooms */

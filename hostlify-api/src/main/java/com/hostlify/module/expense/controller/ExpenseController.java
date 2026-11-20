@@ -24,9 +24,11 @@ import java.util.Map;
 public class ExpenseController {
 
     private final ExpenseService expenseService;
+    private final com.hostlify.module.ops.AttendanceService attendanceService;
 
-    public ExpenseController(ExpenseService expenseService) {
+    public ExpenseController(ExpenseService expenseService, com.hostlify.module.ops.AttendanceService attendanceService) {
         this.expenseService = expenseService;
+        this.attendanceService = attendanceService;
     }
 
     private UserPrincipal getPrincipal() {
@@ -191,7 +193,9 @@ public class ExpenseController {
             throw new com.hostlify.shared.exception.AppException("Salary amount must be greater than 0", org.springframework.http.HttpStatus.BAD_REQUEST);
         if (deductions.signum() < 0 || deductions.compareTo(gross) > 0)
             throw new com.hostlify.shared.exception.AppException("Deductions must be between 0 and the salary amount", org.springframework.http.HttpStatus.BAD_REQUEST);
-        return ApiResponse.ok(expenseService.recordSalary(employeeId, month, year, gross, deductions));
+        ExpenseSalaryRecord rec = expenseService.recordSalary(employeeId, month, year, gross, deductions);
+        // Keep the attendance this salary was based on, for the salary slip
+        return ApiResponse.ok(attendanceService.stampSalary(rec, (String) body.get("deductionNote")));
     }
 
     @GetMapping("/api/v1/employee/salary/hostel/{hostelId}")

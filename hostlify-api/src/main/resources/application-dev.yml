@@ -11,8 +11,17 @@ app:
   jwt:
     secret: dev_secret_key_min_32_chars_long_here_abcdef1234567890
   notification:
-    skip-email: true
+    # Set SKIP_EMAIL=false plus MAIL_HOST/MAIL_USERNAME/MAIL_PASSWORD/MAIL_FROM to send real email in dev
+    skip-email: ${SKIP_EMAIL:true}
     skip-sms: true
+  storage:
+    # Dev: store uploads on disk instead of Azure (served via signed /api/v1/public/files links).
+    # Production leaves this empty to use Azure Blob Storage.
+    local-dir: ${APP_STORAGE_LOCAL_DIR:./uploads}
+  push:
+    # DEV-ONLY key pair (localhost). Production must set its own via APP_PUSH_VAPID_* env vars.
+    vapid-public-key: ${APP_PUSH_VAPID_PUBLIC_KEY:BIHMOs7pZ6qDombXS3N_nE4qWCzwnzCMc_JYZi_SazVblvtADeWyqQQPyDQDsBl3lpste0HsMqH5zrWXKOzkO9I}
+    vapid-private-key: ${APP_PUSH_VAPID_PRIVATE_KEY:TzGmXPddCUg_YIUYSd1B589QuiKRMiKS5au0puI-kt4}
 
 logging:
   level:

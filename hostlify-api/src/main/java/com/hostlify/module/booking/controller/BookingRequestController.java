@@ -63,9 +63,21 @@ public class BookingRequestController {
             throw new com.hostlify.shared.exception.AppException("Invalid check-in date",
                     org.springframework.http.HttpStatus.BAD_REQUEST);
         }
+        if (!Boolean.TRUE.equals(body.get("acceptTerms"))) {
+            throw new com.hostlify.shared.exception.AppException(
+                    "Please confirm you have read the cost of stay and the house rules", org.springframework.http.HttpStatus.BAD_REQUEST);
+        }
         String notes = (String) body.get("preferenceNotes");
+        String stayType = body.get("stayType") == null ? "MONTHLY" : String.valueOf(body.get("stayType"));
+        LocalDate checkOut = null;
+        if (body.get("checkOutDate") != null && !String.valueOf(body.get("checkOutDate")).isBlank()) {
+            try { checkOut = LocalDate.parse(String.valueOf(body.get("checkOutDate"))); }
+            catch (java.time.format.DateTimeParseException e) {
+                throw new com.hostlify.shared.exception.AppException("Check-out date must be YYYY-MM-DD", org.springframework.http.HttpStatus.BAD_REQUEST);
+            }
+        }
         BookingRequest req = requestService.createRequest(
-                p.getUserId(), p.getHostellerProfileId(), hostelId, bedId, checkIn, notes);
+                p.getUserId(), p.getHostellerProfileId(), hostelId, bedId, checkIn, notes, stayType, checkOut);
         return ApiResponse.ok(req, "Booking request submitted");
     }
 

@@ -25,6 +25,16 @@ public class HostelPricing {
     @Column(name = "base_rent", nullable = false, precision = 12, scale = 2)
     private BigDecimal baseRent;
 
+    /** Short-stay rates (null = not offered): per day, per 7 days, per 15 days. */
+    @Column(name = "daily_rent", precision = 12, scale = 2)
+    private BigDecimal dailyRent;
+
+    @Column(name = "weekly_rent", precision = 12, scale = 2)
+    private BigDecimal weeklyRent;
+
+    @Column(name = "fortnight_rent", precision = 12, scale = 2)
+    private BigDecimal fortnightRent;
+
     @Column(name = "deposit_months", nullable = false)
     private int depositMonths = 2;
 
