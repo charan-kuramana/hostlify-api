@@ -56,6 +56,7 @@ public class HostelController {
 
     // Hostel endpoints
     @GetMapping("/hostels")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ApiResponse<Page<Hostel>> getHostels(@RequestParam(defaultValue = "0") int page,
                                                  @RequestParam(defaultValue = "20") int size) {
         return ApiResponse.ok(hostelService.getHostels(PageRequest.of(page, size)));
@@ -63,6 +64,7 @@ public class HostelController {
 
     @GetMapping("/hostels/{id}")
     public ApiResponse<Hostel> getHostel(@PathVariable Long id) {
+        staffOnlyOwnHostel(id); // hostellers may view any hostel (browsing to book); staff only their own
         return ApiResponse.ok(hostelService.getHostel(id));
     }
 
@@ -109,6 +111,7 @@ public class HostelController {
     // Floor endpoints
     @GetMapping("/hostels/{hostelId}/floors")
     public ApiResponse<List<Floor>> getFloors(@PathVariable Long hostelId) {
+        staffOnlyOwnHostel(hostelId);
         return ApiResponse.ok(hostelService.getFloorsByHostel(hostelId));
     }
 
@@ -160,6 +163,7 @@ public class HostelController {
     // Room endpoints
     @GetMapping("/floors/{floorId}/rooms")
     public ApiResponse<List<Room>> getRooms(@PathVariable Long floorId) {
+        staffOnlyOwnHostel(hostelService.getFloor(floorId).getHostelId());
         return ApiResponse.ok(hostelService.getRoomsByFloor(floorId));
     }
 
@@ -206,8 +210,29 @@ public class HostelController {
 
     // Bed endpoints
     @GetMapping("/rooms/{roomId}/beds")
-    public ApiResponse<List<Bed>> getBeds(@PathVariable Long roomId) {
-        return ApiResponse.ok(hostelService.getBedsByRoom(roomId));
+    public ApiResponse<List<Map<String, Object>>> getBeds(@PathVariable Long roomId) {
+        Long hostelId = hostelService.getRoom(roomId).getHostelId();
+        staffOnlyOwnHostel(hostelId);
+        // Who a bed is reserved for / which booking occupies it is staff-only information
+        boolean staff = HostelAccess.principal().isSuperAdmin() || HostelAccess.principal().isStaff();
+        return ApiResponse.ok(hostelService.getBedsByRoom(roomId).stream().map(b -> {
+            Map<String, Object> m = new java.util.LinkedHashMap<>();
+            m.put("id", b.getId());
+            m.put("roomId", b.getRoomId());
+            m.put("hostelId", b.getHostelId());
+            m.put("bedName", b.getBedName());
+            m.put("status", b.getStatus());
+            if (staff) {
+                m.put("reservedForHostellerId", b.getReservedForHostellerId());
+                m.put("occupiedByBookingId", b.getOccupiedByBookingId());
+            }
+            return m;
+        }).toList());
+    }
+
+    private static void staffOnlyOwnHostel(Long hostelId) {
+        var p = HostelAccess.principal();
+        if (p.isStaff()) HostelAccess.requireStaffHostel(hostelId);
     }
 
     @PostMapping("/rooms/{roomId}/beds")

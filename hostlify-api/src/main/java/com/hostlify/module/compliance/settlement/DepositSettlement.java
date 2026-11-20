@@ -16,7 +16,11 @@ import java.util.List;
 @Table(name = "deposit_settlements")
 public class DepositSettlement {
 
-    public record Deduction(String label, BigDecimal amount) {}
+    /** A deduction with an optional explanation and the checklist photos that back it up. */
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)
+    public record Deduction(String label, BigDecimal amount, String note, List<Long> photoIds) {
+        public Deduction(String label, BigDecimal amount) { this(label, amount, null, null); }
+    }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -74,6 +78,37 @@ public class DepositSettlement {
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    /** OPEN | RESOLVED — the resident disagreed with the settlement */
+    @Column(name = "dispute_status", length = 10)
+    private String disputeStatus;
+
+    @Column(name = "dispute_reason", length = 1000)
+    private String disputeReason;
+
+    @Column(name = "disputed_at")
+    private LocalDateTime disputedAt;
+
+    @Column(name = "dispute_response", length = 1000)
+    private String disputeResponse;
+
+    @Column(name = "dispute_resolved_at")
+    private LocalDateTime disputeResolvedAt;
+
+    /** Deductions given up while resolving a dispute (already added to refundAmount) */
+    @Column(name = "waived_amount", nullable = false, precision = 12, scale = 2)
+    private BigDecimal waivedAmount = BigDecimal.ZERO;
+
+    /** Refund promised by: check-out date + the hostel's refund days */
+    @Transient
+    private java.time.LocalDate refundDueBy;
+
+    @Transient
+    private boolean refundOverdue;
+
+    /** Move-in / move-out photos that deductions can point to: [{id, url, caption, kind}] */
+    @Transient
+    private List<java.util.Map<String, Object>> evidencePhotos;
 
     @Transient
     private List<Deduction> deductions;

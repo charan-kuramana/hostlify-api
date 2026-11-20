@@ -362,6 +362,8 @@ public class ReceiptPdfService {
             case "UPI", "UPI_MANUAL", "UPI_DIRECT" -> "UPI";
             case "BANK_TRANSFER" -> "Bank transfer";
             case "CHEQUE" -> "Cheque";
+            case "STRIPE" -> "Online (Stripe)";
+            case "PAYPAL" -> "Online (PayPal)";
             default -> m.startsWith("RAZORPAY") ? "Online (Razorpay)" : m.replace('_', ' ');
         };
     }

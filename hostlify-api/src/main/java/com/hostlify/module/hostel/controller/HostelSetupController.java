@@ -154,6 +154,7 @@ public class HostelSetupController {
     @PreAuthorize("hasAnyRole('HOSTELLER','HOSTEL_STAFF')")
     @Operation(summary = "Get floors with available bed counts")
     public ApiResponse<List<Map<String, Object>>> getFloorsWithAvailability(@PathVariable Long hostelId) {
+        if (HostelAccess.principal().isStaff()) HostelAccess.requireStaffHostel(hostelId);
         return ApiResponse.ok(setupService.getFloorsWithAvailability(hostelId));
     }
 
@@ -161,6 +162,7 @@ public class HostelSetupController {
     @PreAuthorize("hasAnyRole('HOSTELLER','HOSTEL_STAFF')")
     @Operation(summary = "Get rooms on a floor with availability")
     public ApiResponse<List<Map<String, Object>>> getRoomsWithAvailability(@PathVariable Long floorId) {
+        if (HostelAccess.principal().isStaff()) HostelAccess.requireStaffHostel(hostelService.getFloor(floorId).getHostelId());
         return ApiResponse.ok(setupService.getRoomsWithAvailability(floorId));
     }
 
@@ -168,6 +170,8 @@ public class HostelSetupController {
     @PreAuthorize("hasAnyRole('HOSTELLER','HOSTEL_STAFF')")
     @Operation(summary = "Full nested structure: floors → rooms → beds with occupancy")
     public ApiResponse<List<Map<String, Object>>> getHostelStructure(@PathVariable Long hostelId) {
+        // Occupancy layout: staff of this hostel, or residents living in it
+        HostelAccess.requireHostelMember(hostelId);
         return ApiResponse.ok(setupService.getHostelStructure(hostelId));
     }
 
@@ -178,9 +182,34 @@ public class HostelSetupController {
     @Operation(summary = "Hosteller: discover nearby hostels by GPS")
     public ApiResponse<List<Map<String, Object>>> getNearbyHostels(@RequestParam double lat,
                                                                      @RequestParam double lng,
-                                                                     @RequestParam(defaultValue = "10") double radius) {
+                                                                     @RequestParam(required = false) Double radius) {
         return ApiResponse.ok(discoveryService.getNearbyHostels(lat, lng, radius));
     }
+
+    @GetMapping("/hostel/discover")
+    @PreAuthorize("hasRole('HOSTELLER')")
+    @Operation(summary = "Hosteller: one search — nearby (owner-set radius) when empty, text match otherwise; distance when located")
+    public ApiResponse<List<Map<String, Object>>> discover(@RequestParam(required = false) String q,
+                                                            @RequestParam(required = false) Double lat,
+                                                            @RequestParam(required = false) Double lng) {
+        return ApiResponse.ok(discoveryService.discover(q, lat, lng));
+    }
+
+    @GetMapping("/hostels/{hostelId}/short-stay/quote")
+    @PreAuthorize("hasRole('HOSTELLER')")
+    @Operation(summary = "Hosteller: price of a short stay on a bed")
+    public ApiResponse<Map<String, Object>> shortStayQuote(@PathVariable Long hostelId, @RequestParam Long bedId,
+                                                           @RequestParam String checkIn, @RequestParam String checkOut) {
+        try {
+            return ApiResponse.ok(shortStays.view(shortStays.quote(hostelId, bedId,
+                    java.time.LocalDate.parse(checkIn), java.time.LocalDate.parse(checkOut))));
+        } catch (java.time.format.DateTimeParseException e) {
+            throw new com.hostlify.shared.exception.AppException("Dates must be YYYY-MM-DD", org.springframework.http.HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.hostlify.module.booking.service.ShortStayService shortStays;
 
     @GetMapping("/hostel/search")
     @PreAuthorize("hasRole('HOSTELLER')")

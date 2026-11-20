@@ -54,6 +54,14 @@ public class SettlementService {
         this.events = events;
     }
 
+    @org.springframework.beans.factory.annotation.Autowired
+    @org.springframework.context.annotation.Lazy
+    private com.hostlify.module.hostel.policy.PolicyService policies;
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.hostlify.module.resident.checkout.CheckoutService.Repo checkoutRepo;
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.hostlify.module.hostel.repository.HostelRepository hostelRepo;
+
     public BookingCheckin booking(Long bookingId) {
         return bookingRepo.findById(bookingId).orElseThrow(() -> new AppException("Booking not found", HttpStatus.NOT_FOUND));
     }
@@ -80,6 +88,8 @@ public class SettlementService {
         if (!"DRAFT".equals(s.getStatus())) throw new AppException("This settlement is already finalized", HttpStatus.CONFLICT);
         if (deductions != null) {
             if (deductions.size() > 30) throw bad("Up to 30 deductions");
+            Set<Long> photoIdsOfStay = new HashSet<>();
+            checklistService.photosForBooking(s.getBookingId()).forEach(p -> photoIdsOfStay.add(((Number) p.get("id")).longValue()));
             List<DepositSettlement.Deduction> clean = new ArrayList<>();
             for (Map<String, Object> d : deductions) {
                 String label = d.get("label") == null ? "" : String.valueOf(d.get("label")).trim();
@@ -87,7 +97,19 @@ public class SettlementService {
                 BigDecimal amt;
                 try { amt = new BigDecimal(String.valueOf(d.get("amount"))).setScale(2, RoundingMode.HALF_UP); } catch (Exception e) { throw bad("Deduction amount must be a number"); }
                 if (amt.signum() <= 0 || amt.compareTo(new BigDecimal("1000000")) > 0) throw bad("Deduction amounts must be between 1 and 10,00,000");
-                clean.add(new DepositSettlement.Deduction(label, amt));
+                String note = d.get("note") == null ? null : String.valueOf(d.get("note")).trim();
+                if (note != null && note.isEmpty()) note = null;
+                if (note != null && note.length() > 300) throw bad("Keep each deduction note under 300 characters");
+                List<Long> photos = new ArrayList<>();
+                if (d.get("photoIds") instanceof List<?> l) {
+                    for (Object o : l) {
+                        long pid;
+                        try { pid = Long.parseLong(String.valueOf(o)); } catch (Exception e) { throw bad("Invalid photo"); }
+                        if (!photoIdsOfStay.contains(pid)) throw bad("Photos must come from this resident's move-in or move-out checklist");
+                        if (!photos.contains(pid)) photos.add(pid);
+                    }
+                }
+                clean.add(new DepositSettlement.Deduction(label, amt, note, photos.isEmpty() ? null : photos));
             }
             s.setDeductionsJson(json(clean));
         }
@@ -180,10 +202,97 @@ public class SettlementService {
         return repo.findByBookingId(bookingId).map(s -> view(s, booking(bookingId)));
     }
 
+    // ─── refund deadline + disputes ────────────────────────────────────────
+
+    /** Check-out date + the hostel's refund days (null while the resident is still staying). */
+    public java.time.LocalDate refundDueBy(BookingCheckin b) {
+        if (b.getCheckoutDate() == null) return null;
+        return b.getCheckoutDate().plusDays(policies.get(b.getHostelId()).getDepositRefundDays());
+    }
+
+    /** Nothing more to pay back: refunded, or finalized with no refund. */
+    public static boolean isSettled(DepositSettlement s) {
+        return s != null && ("REFUNDED".equals(s.getStatus()) || ("FINALIZED".equals(s.getStatus()) && s.getRefundAmount().signum() <= 0));
+    }
+
+    /** Stays the resident has left whose deposit isn't settled yet (no statement, or still a draft). */
+    public List<Map<String, Object>> pendingForResident(Long hostellerId) {
+        java.time.LocalDate today = DateUtils.todayKolkata();
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (BookingCheckin b : bookingRepo.findByHostellerIdOrderByCreatedAtDesc(hostellerId)) {
+            if (!"CHECKED_OUT".equals(b.getStatus()) || b.getCheckoutDate() == null || b.getCheckoutDate().isBefore(today.minusDays(180))) continue;
+            DepositSettlement s = repo.findByBookingId(b.getId()).orElse(null);
+            if (s != null && !"DRAFT".equals(s.getStatus())) continue;
+            BigDecimal held = depositHeld(b);
+            if (held.signum() <= 0) continue;
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("bookingId", b.getId());
+            m.put("hostelName", hostelRepo.findById(b.getHostelId()).map(h -> h.getName()).orElse("Hostel"));
+            m.put("checkoutDate", b.getCheckoutDate());
+            m.put("depositHeld", held);
+            java.time.LocalDate due = refundDueBy(b);
+            m.put("refundDueBy", due);
+            m.put("overdue", due != null && today.isAfter(due));
+            out.add(m);
+        }
+        return out;
+    }
+
+    @Transactional
+    public DepositSettlement dispute(Long id, Long hostellerId, String reason) {
+        DepositSettlement s = get(id);
+        if (!Objects.equals(s.getHostellerId(), hostellerId)) throw new AppException("Settlement not found", HttpStatus.NOT_FOUND);
+        if ("DRAFT".equals(s.getStatus())) throw new AppException("Settlement not found", HttpStatus.NOT_FOUND);
+        if ("OPEN".equals(s.getDisputeStatus())) throw new AppException("You have already raised this. The hostel will reply.", HttpStatus.CONFLICT);
+        if ("RESOLVED".equals(s.getDisputeStatus())) throw new AppException("This was already reviewed by the hostel", HttpStatus.CONFLICT);
+        if (s.getFinalizedAt() != null && s.getFinalizedAt().isBefore(LocalDateTime.now().minusDays(60))) {
+            throw bad("Disputes can be raised within 60 days of the settlement");
+        }
+        String r = reason == null ? "" : reason.trim();
+        if (r.length() < 10 || r.length() > 1000) throw bad("Explain what you disagree with (10 to 1000 characters)");
+        s.setDisputeStatus("OPEN");
+        s.setDisputeReason(r);
+        s.setDisputedAt(LocalDateTime.now());
+        DepositSettlement saved = repo.save(s);
+        events.publishEvent(new com.hostlify.shared.event.StaffNoticeEvent(this, s.getHostelId(), "SETTLEMENT_DISPUTED",
+                "Deposit settlement disputed",
+                "A resident disagrees with their deposit settlement #" + s.getId() + ": \"" + (r.length() > 160 ? r.substring(0, 160) + "…" : r)
+                        + "\". Reply from the resident's Documents tab.", "/admin/members/" + s.getHostellerId(), false, true));
+        return view(saved, booking(s.getBookingId()));
+    }
+
+    /** Staff reply to a dispute; optionally give up part of the deductions (added to the refund). */
+    @Transactional
+    public DepositSettlement resolveDispute(Long id, String response, BigDecimal waive) {
+        DepositSettlement s = get(id);
+        if (!"OPEN".equals(s.getDisputeStatus())) throw new AppException("There is no open dispute on this settlement", HttpStatus.CONFLICT);
+        String r = response == null ? "" : response.trim();
+        if (r.length() < 5 || r.length() > 1000) throw bad("Write a reply to the resident (5 to 1000 characters)");
+        BigDecimal w = waive == null ? BigDecimal.ZERO : waive.setScale(2, RoundingMode.HALF_UP);
+        if (w.signum() < 0) throw bad("Amount given up can't be negative");
+        if (w.signum() > 0) {
+            if (!"FINALIZED".equals(s.getStatus())) throw bad("The refund was already paid: settle any extra amount outside the app and say so in the reply");
+            if (s.getBalanceDue().signum() > 0) throw bad("This resident still owes a balance; reduce that due in Payments instead");
+            BigDecimal room = deductionTotal(s).subtract(s.getWaivedAmount());
+            if (w.compareTo(room) > 0) throw bad("You can give up at most Rs. " + room + " (the deductions)");
+            s.setWaivedAmount(s.getWaivedAmount().add(w));
+            s.setRefundAmount(s.getRefundAmount().add(w));
+        }
+        s.setDisputeStatus("RESOLVED");
+        s.setDisputeResponse(r);
+        s.setDisputeResolvedAt(LocalDateTime.now());
+        DepositSettlement saved = repo.save(s);
+        events.publishEvent(new ResidentNoticeEvent(this, s.getHostellerId(), "SETTLEMENT_DISPUTE_REPLY",
+                "Reply about your deposit settlement",
+                (w.signum() > 0 ? "The hostel reduced the deductions by Rs. " + w + "; your refund is now Rs. " + saved.getRefundAmount() + ". " : "")
+                        + "Their reply: " + r, "/app/documents"));
+        return view(saved, booking(s.getBookingId()));
+    }
+
     // ─── maths ─────────────────────────────────────────────────────────────
 
     /** Deposit actually held: the advance taken at allocation + any paid "Deposit" charges. */
-    BigDecimal depositHeld(BookingCheckin b) {
+    public BigDecimal depositHeld(BookingCheckin b) {
         BigDecimal advance = b.getAdvanceAmount() == null ? BigDecimal.ZERO : b.getAdvanceAmount();
         BigDecimal depositCharges = dueRepo.findByHostellerIdOrderByDueDateDesc(b.getHostellerId()).stream()
                 .filter(d -> "DEPOSIT".equals(d.getDueType()))
@@ -198,6 +307,11 @@ public class SettlementService {
         BigDecimal net = s.getDepositHeld().subtract(s.getUnpaidDues()).subtract(deductionTotal(s));
         s.setRefundAmount(net.max(BigDecimal.ZERO));
         s.setBalanceDue(net.signum() < 0 ? net.negate() : BigDecimal.ZERO);
+    }
+
+    /** Total still unpaid for this stay (what the deposit would be adjusted against). */
+    public BigDecimal openDuesTotal(BookingCheckin b) {
+        return openDues(b).stream().map(this::outstanding).reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     /** Open dues of this resident for this stay, oldest first. Unpaid "Deposit" charges aren't owed back to the hostel. */
@@ -235,6 +349,9 @@ public class SettlementService {
 
     private DepositSettlement view(DepositSettlement s, BookingCheckin b) {
         s.setDeductions(deductions(s));
+        s.setRefundDueBy(refundDueBy(b));
+        s.setRefundOverdue(!isSettled(s) && s.getRefundDueBy() != null && DateUtils.todayKolkata().isAfter(s.getRefundDueBy()));
+        s.setEvidencePhotos(checklistService.photosForBooking(b.getId()));
         if ("DRAFT".equals(s.getStatus())) {
             s.setOpenDues(openDues(b).stream().map(d -> {
                 Map<String, Object> m = new LinkedHashMap<>();
@@ -243,8 +360,19 @@ public class SettlementService {
                 m.put("outstanding", outstanding(d));
                 return m;
             }).toList());
-            s.setDamageSuggestions(checklistService.newDamage(b.getId()).stream()
+            List<String> suggestions = new ArrayList<>(checklistService.newDamage(b.getId()).stream()
                     .map(i -> i.label() + " (" + i.condition().toLowerCase() + (i.note() != null ? ": " + i.note() : "") + ")").toList());
+            // From the resident's check-out request: short notice / early exit, as estimated when they asked
+            checkoutRepo.findByHostellerIdOrderByIdDesc(b.getHostellerId()).stream()
+                    .filter(r -> Objects.equals(r.getBookingId(), b.getId()) && r.getEstimateJson() != null && !"CANCELLED".equals(r.getStatus()))
+                    .findFirst().map(r -> policies.parseTerms(r.getEstimateJson())).ifPresent(est -> {
+                        Object sn = est.get("shortNoticeCharge"), ex = est.get("earlyExitFee");
+                        if (sn != null && new BigDecimal(String.valueOf(sn)).signum() > 0)
+                            suggestions.add("Short notice: " + est.get("shortNoticeDays") + " days (Rs. " + new BigDecimal(String.valueOf(sn)).setScale(2, RoundingMode.HALF_UP) + ")");
+                        if (Boolean.TRUE.equals(est.get("inLockIn")) && ex != null && new BigDecimal(String.valueOf(ex)).signum() > 0)
+                            suggestions.add("Early exit within lock-in (Rs. " + new BigDecimal(String.valueOf(ex)).setScale(2, RoundingMode.HALF_UP) + ")");
+                    });
+            s.setDamageSuggestions(suggestions);
         }
         return s;
     }

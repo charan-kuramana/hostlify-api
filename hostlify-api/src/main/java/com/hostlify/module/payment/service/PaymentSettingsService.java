@@ -78,6 +78,7 @@ public class PaymentSettingsService {
             s.setLandlordPan(pan);
         }
         if (body.containsKey("landlordAddress")) s.setLandlordAddress(limit(trimToNull(body.get("landlordAddress")), 1000));
+        if (body.containsKey("utilitiesIncluded")) s.setUtilitiesIncluded(!Boolean.FALSE.equals(body.get("utilitiesIncluded")));
 
         s.setUpdatedAt(LocalDateTime.now());
         return repo.save(s);
@@ -90,6 +91,7 @@ public class PaymentSettingsService {
         m.put("dueDay", s.getDueDay());
         m.put("upiId", s.getUpiId());
         m.put("upiPayeeName", s.getUpiPayeeName());
+        m.put("utilitiesIncluded", s.isUtilitiesIncluded());
         m.put("lateFeeEnabled", s.isLateFeeEnabled());
         if (s.isLateFeeEnabled()) {
             m.put("lateFeeType", s.getLateFeeType());

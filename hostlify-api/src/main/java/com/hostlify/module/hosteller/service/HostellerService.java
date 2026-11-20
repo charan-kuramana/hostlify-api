@@ -73,6 +73,18 @@ public class HostellerService {
         if (req.getDateOfBirth() != null)      existing.setDateOfBirth(req.getDateOfBirth());
         if (req.getUserType() != null)         existing.setUserType(req.getUserType());
         if (req.getCompanyCollege() != null)   existing.setCompanyCollege(req.getCompanyCollege());
+        if (req.getBloodGroup() != null) {
+            String bg = req.getBloodGroup().trim().toUpperCase();
+            if (!bg.isEmpty() && !java.util.Set.of("A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-").contains(bg)) {
+                throw new AppException("Blood group must be like A+, O- or AB+", HttpStatus.BAD_REQUEST);
+            }
+            existing.setBloodGroup(bg.isEmpty() ? null : bg);
+        }
+        if (req.getMedicalNotes() != null) {
+            String mn = req.getMedicalNotes().trim();
+            if (mn.length() > 300) throw new AppException("Medical notes must be 300 characters or less", HttpStatus.BAD_REQUEST);
+            existing.setMedicalNotes(mn.isEmpty() ? null : mn);
+        }
         if (req.getPermanentAddress() != null) existing.setPermanentAddress(req.getPermanentAddress());
         if (req.getCity() != null)             existing.setCity(req.getCity());
         if (req.getPincode() != null)          existing.setPincode(req.getPincode());

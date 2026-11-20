@@ -24,6 +24,9 @@ public class HostellerController {
     private final HostellerService hostellerService;
     private final AzureBlobService blobService;
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.hostlify.module.booking.service.ApplicantAccess applicants;
+
     public HostellerController(HostellerService hostellerService, AzureBlobService blobService) {
         this.hostellerService = hostellerService;
         this.blobService = blobService;
@@ -55,7 +58,8 @@ public class HostellerController {
                     org.springframework.http.HttpStatus.FORBIDDEN);
         }
         HostellerProfile profile = hostellerService.getByAuthUser(authUserId);
-        if (p.isStaff()) com.hostlify.shared.security.HostelAccess.requireHostellerRecord(profile.getId(), profile.getHostelId(), true);
+        if (p.isStaff() && !applicants.linkedToMyHostels(profile.getAuthUserId()))
+            com.hostlify.shared.security.HostelAccess.requireHostellerRecord(profile.getId(), profile.getHostelId(), false);
         return ApiResponse.ok(profile);
     }
 
@@ -143,7 +147,9 @@ public class HostellerController {
         // Staff: only residents of their own hostels (or not-yet-allocated applicants they may allocate)
         if (p.isStaff()) {
             HostellerProfile profile = hostellerService.getById(hostellerProfileId);
-            com.hostlify.shared.security.HostelAccess.requireHostellerRecord(profile.getId(), profile.getHostelId(), true);
+            // Staff of the resident's hostel, or of a hostel they have applied to (e.g. moving here)
+            if (!applicants.linkedToMyHostels(profile.getAuthUserId()))
+                com.hostlify.shared.security.HostelAccess.requireHostellerRecord(profile.getId(), profile.getHostelId(), false);
         }
     }
 

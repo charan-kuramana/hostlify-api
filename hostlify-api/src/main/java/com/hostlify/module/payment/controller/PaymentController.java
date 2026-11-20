@@ -65,7 +65,7 @@ public class PaymentController {
         UserPrincipal principal = getPrincipal();
         // Hosteller's profile id from principal or lookup
         return ApiResponse.ok(paymentService.getDuesByHosteller(
-                principal.getHostellerProfileId() != null ? principal.getHostellerProfileId() : principal.getUserId()));
+                principal.getHostellerProfileId() != null ? principal.getHostellerProfileId() : paymentService.profileIdOf(principal.getUserId())));
     }
 
     // ─── Razorpay ────────────────────────────────────────────────
@@ -74,10 +74,10 @@ public class PaymentController {
     @PreAuthorize("hasRole('HOSTELLER')")
     @Operation(summary = "Hosteller: initiate Razorpay order for a due (returns checkout info)")
     public ApiResponse<Map<String, Object>> initiateRazorpay(@RequestBody Map<String, Object> body) {
-        UserPrincipal principal = getPrincipal();
-        Long dueId = ((Number) body.get("dueId")).longValue();
-        return ApiResponse.ok(paymentService.initiateRazorpayCheckout(principal.getUserId(), dueId),
-                "Razorpay order created");
+        // Rent must reach the hostel owner's own account, never the platform's keys: use /payment/online/*
+        throw new com.hostlify.shared.exception.AppException(
+                "Please refresh the page: online payments now go directly to your hostel's own account.",
+                org.springframework.http.HttpStatus.GONE);
     }
 
     @PostMapping("/razorpay/verify")
@@ -384,10 +384,10 @@ public class PaymentController {
 
     @PostMapping("/dues")
     @PreAuthorize("hasRole('HOSTEL_STAFF')")
-    public ApiResponse<PaymentDue> createDue(@RequestBody PaymentDue due) {
-        HostelAccess.denySupervisor();
-        HostelAccess.requireStaffHostel(due.getHostelId());
-        return ApiResponse.ok(paymentService.createDue(due));
+    public ApiResponse<PaymentDue> createDue(@RequestBody Map<String, Object> body) {
+        // Bound straight to the entity it let a caller overwrite another hostel's due (by id) or bill
+        // another owner's resident. Charges go through POST /payment/dues/charge, which checks the resident.
+        throw new com.hostlify.shared.exception.AppException("Use POST /payment/dues/charge to add a charge", org.springframework.http.HttpStatus.GONE);
     }
 
     @PutMapping("/dues/{id}/mark-paid")
@@ -401,6 +401,8 @@ public class PaymentController {
     @GetMapping("/orders/hosteller/{hostellerId}")
     @PreAuthorize("hasRole('HOSTEL_STAFF')")
     public ApiResponse<List<PaymentRazorpayOrder>> getOrders(@PathVariable Long hostellerId) {
+        HostelAccess.denySupervisor();
+        HostelAccess.requireStaffHostel(paymentService.hostelOfHosteller(hostellerId));
         return ApiResponse.ok(paymentService.getOrdersByHosteller(hostellerId));
     }
 

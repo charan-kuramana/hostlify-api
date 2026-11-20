@@ -57,6 +57,10 @@ public class BookingService {
         this.eventPublisher = eventPublisher;
     }
 
+    @org.springframework.beans.factory.annotation.Autowired
+    @org.springframework.context.annotation.Lazy
+    private com.hostlify.module.hostel.policy.PolicyService policies;
+
     /**
      * CRITICAL: Allocate a bed to a pending hosteller.
      * Uses SERIALIZABLE isolation + PESSIMISTIC_WRITE lock on the bed row.
@@ -66,12 +70,28 @@ public class BookingService {
     public BookingCheckin allocateBed(Long hostellerAuthUserId, Long bedId,
                                       LocalDate checkInDate, BigDecimal rentAmount,
                                       BigDecimal advanceAmount, String advancePaymentMode) {
-        // 1. Check hosteller is PENDING
+        return allocateBed(hostellerAuthUserId, bedId, checkInDate, rentAmount, advanceAmount, advancePaymentMode, null);
+    }
+
+    /** A short stay: planned check-out date and the total for the whole stay (billed once, no monthly rent). */
+    public record ShortStay(LocalDate checkOutDate, int days, BigDecimal amount, String description) {}
+
+    @Transactional
+    public BookingCheckin allocateBed(Long hostellerAuthUserId, Long bedId,
+                                      LocalDate checkInDate, BigDecimal rentAmount,
+                                      BigDecimal advanceAmount, String advancePaymentMode, ShortStay shortStay) {
+        // 1. A new applicant, or someone who has checked out of their previous hostel (moving)
         HostellerProfile profile = profileRepo.findByAuthUserId(hostellerAuthUserId)
                 .orElseThrow(() -> new AppException("Hosteller profile not found", HttpStatus.NOT_FOUND));
 
-        if (!"PENDING".equals(profile.getStatus())) {
-            throw new AppException("Hosteller is not in PENDING status (current: " + profile.getStatus() + ")",
+        if (bookingRepo.findFirstByHostellerIdAndStatus(profile.getId(), "ACTIVE").isPresent()) {
+            String where = profile.getHostelId() == null ? "another hostel"
+                    : hostelRepo.findById(profile.getHostelId()).map(Hostel::getName).orElse("another hostel");
+            throw new AppException("This resident still has an active stay at " + where
+                    + ". They need to check out there first (they can request it from their app).", HttpStatus.CONFLICT);
+        }
+        if (!"PENDING".equals(profile.getStatus()) && !"CHECKED_OUT".equals(profile.getStatus())) {
+            throw new AppException("This resident cannot be allocated a bed right now (status: " + profile.getStatus() + ")",
                     HttpStatus.CONFLICT);
         }
 
@@ -116,17 +136,44 @@ public class BookingService {
         booking.setRoomId(room.getId());
         booking.setBedId(bed.getId());
         booking.setCheckinDate(checkInDate != null ? checkInDate : LocalDate.now());
-        booking.setRentAmount(rentAmount != null ? rentAmount : hostel.getDefaultRent());
+        // No rent typed by staff → the price the resident was shown for this room type (not the hostel default)
+        booking.setRentAmount(rentAmount != null ? rentAmount : policies.advertisedRent(room, hostel));
+        try {
+            booking.setTermsJson(policies.termsSnapshot(hostel.getId(), bed.getId()));
+        } catch (RuntimeException e) {
+            // terms are informational; never block a check-in on them
+        }
         booking.setAdvanceAmount(advanceAmount != null ? advanceAmount : BigDecimal.ZERO);
         booking.setStatus("ACTIVE");
+        if (shortStay != null) {
+            booking.setRentFrequency("SHORT");
+            booking.setCustomFrequencyDays(shortStay.days());
+            booking.setExpectedCheckoutDate(shortStay.checkOutDate());
+            booking.setRentAmount(shortStay.amount());
+        }
         BookingCheckin saved = bookingRepo.save(booking);
 
         // 6b. Generate the first rent due (move-in month) so the hosteller has something to pay.
+        //     A short stay is billed once for the whole stay instead.
         LocalDate checkin = saved.getCheckinDate();
         int month = checkin.getMonthValue();
         int year = checkin.getYear();
-        boolean dueExists = dueRepo.findRentDue(profile.getId(), year, month).isPresent();
-        if (!dueExists) {
+        // Only a rent due from THIS hostel counts (a resident moving mid-month still owes the new hostel)
+        boolean dueExists = shortStay == null && dueRepo.findRentDue(profile.getId(), year, month)
+                .filter(d -> java.util.Objects.equals(d.getHostelId(), hostel.getId())).isPresent();
+        if (shortStay != null) {
+            PaymentDue due = new PaymentDue();
+            due.setHostellerId(profile.getId());
+            due.setBookingId(saved.getId());
+            due.setHostelId(hostel.getId());
+            due.setPeriodMonth(month);
+            due.setPeriodYear(year);
+            due.setDueDate(checkin);
+            due.setRentAmount(shortStay.amount());
+            due.setDescription(shortStay.description());
+            due.setStatus("UNPAID");
+            dueRepo.save(due);
+        } else if (!dueExists) {
             PaymentDue due = new PaymentDue();
             due.setHostellerId(profile.getId());
             due.setBookingId(saved.getId());
@@ -181,11 +228,9 @@ public class BookingService {
         if (profile != null) {
             profile.setStatus("CHECKED_OUT");
             profileRepo.save(profile);
+            // The login stays active: a former resident still needs receipts, their deposit refund,
+            // to review the stay, and to book their next hostel.
             authUser = authUserRepo.findById(profile.getAuthUserId()).orElse(null);
-            if (authUser != null) {
-                authUser.setStatus("INACTIVE");
-                authUserRepo.save(authUser);
-            }
         }
 
         booking.setStatus("CHECKED_OUT");

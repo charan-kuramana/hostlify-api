@@ -16,6 +16,10 @@ import java.util.Map;
 @Service
 public class HostelService {
 
+    /** Plan limits (Section 6): adding beds is checked against the owner's plan. */
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.hostlify.module.platform.PlanService planService;
+
     private final HostelRepository hostelRepo;
     private final HostelOwnerRepository ownerRepo;
     private final FloorRepository floorRepo;
@@ -110,6 +114,13 @@ public class HostelService {
         if (body.containsKey("onlinePaymentEnabled")) {
             existing.setOnlinePaymentEnabled(Boolean.TRUE.equals(body.get("onlinePaymentEnabled")));
         }
+        if (body.containsKey("discoveryRadiusKm") && body.get("discoveryRadiusKm") != null) {
+            int km;
+            try { km = (int) Math.round(Double.parseDouble(body.get("discoveryRadiusKm").toString())); }
+            catch (NumberFormatException e) { throw new AppException("Nearby radius must be a number of km", HttpStatus.BAD_REQUEST); }
+            if (km < 1 || km > 50) throw new AppException("Nearby radius must be between 1 and 50 km", HttpStatus.BAD_REQUEST);
+            existing.setDiscoveryRadiusKm(km);
+        }
         // Ensure non-null required fields have fallback values to prevent constraint violations
         if (existing.getName() == null || existing.getName().isBlank()) existing.setName("Unnamed Hostel");
         if (existing.getHostelType() == null || existing.getHostelType().isBlank()) existing.setHostelType("MIXED");
@@ -200,7 +211,10 @@ public class HostelService {
         return bedRepo.findById(id).orElseThrow(() -> new AppException("Bed not found", HttpStatus.NOT_FOUND));
     }
     @Transactional
-    public Bed createBed(Bed bed) { return bedRepo.save(bed); }
+    public Bed createBed(Bed bed) {
+        planService.requireBedCapacity(bed.getHostelId(), 1);
+        return bedRepo.save(bed);
+    }
     @Transactional
     public void deleteBed(Long id) {
         Bed bed = getBed(id);

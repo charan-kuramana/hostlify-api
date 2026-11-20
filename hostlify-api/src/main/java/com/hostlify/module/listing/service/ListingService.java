@@ -30,6 +30,10 @@ public class ListingService {
     private final HostelPhotoRepository photoRepo;
     private final AzureBlobService storage;
 
+    /** Paid owners get a premium badge and rank first among hostels with free beds. */
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.hostlify.module.platform.PlanService planService;
+
     @Value("${app.frontend-url:http://localhost:5173}")
     private String frontendUrl;
 
@@ -57,11 +61,13 @@ public class ListingService {
             m.remove("address"); // full address is on the detail page
             m.put("locality", h.getLandmark());
             m.put("coverUrl", coverUrl(h.getId()));
+            m.put("premium", planService.isPremium(h.getOwnerId()));
             out.add(m);
         }
         // Hostels with free beds first, then cheapest
         out.sort(Comparator
                 .comparing((Map<String, Object> m) -> ((Number) m.getOrDefault("availableBeds", 0)).longValue() > 0 ? 0 : 1)
+                .thenComparing(m -> Boolean.TRUE.equals(m.get("premium")) ? 0 : 1)
                 .thenComparing(m -> m.get("minRent") instanceof BigDecimal b ? b : BigDecimal.valueOf(Long.MAX_VALUE)));
         return out;
     }
@@ -87,6 +93,7 @@ public class ListingService {
         Map<String, Object> d = new LinkedHashMap<>(discovery.getHostelDetail(h.getId()));
         d.put("slug", h.getSlug());
         d.put("pincode", h.getPincode());
+        d.put("premium", planService.isPremium(h.getOwnerId()));
         d.put("photos", photos(h.getId(), PUBLIC_LINK_MINUTES));
         // Only enabled amenities, as plain labels
         Object am = d.get("amenities");

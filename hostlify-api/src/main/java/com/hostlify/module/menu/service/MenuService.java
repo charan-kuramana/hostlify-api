@@ -33,6 +33,11 @@ public class MenuService {
                 .orElse(null);
     }
 
+    public Long hostelOfMenu(Long menuId) {
+        return menuRepo.findById(menuId).map(WeeklyMenu::getHostelId)
+                .orElseThrow(() -> new com.hostlify.shared.exception.AppException("Menu not found", org.springframework.http.HttpStatus.NOT_FOUND));
+    }
+
     public List<MenuItem> getMenuItems(Long menuId) {
         return itemRepo.findByMenuIdOrderByDayOfWeekAscMealTypeAsc(menuId);
     }

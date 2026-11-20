@@ -211,6 +211,20 @@ public class NotificationService {
                 event.getSubject(), body, event.getSubject(), event.getBody(), event.getUrl(), null, null);
     }
 
+    /** New complaint, overdue complaint, visitor at the gate, … → push to the hostel's staff. */
+    @Async("notificationExecutor")
+    @TransactionalEventListener(fallbackExecution = true)
+    public void onStaffNotice(com.hostlify.shared.event.StaffNoticeEvent event) {
+        for (Long staffUserId : hostelStaff(event.getHostelId(), event.isIncludeSupervisors())) {
+            pushService.sendToUser(staffUserId, event.getTitle(), event.getBody(), event.getUrl());
+        }
+        if (event.isEmailOwner()) {
+            ownerEmail(event.getHostelId()).ifPresent(email -> safeEmail(email, event.getTitle(),
+                    event.getBody() + "\n\nOpen Hostlify: " + frontendUrl + event.getUrl()));
+        }
+        logOnly("HOSTEL", event.getHostelId(), event.getTemplate(), event.getTitle(), event.getBody());
+    }
+
     @Async("notificationExecutor")
     @EventListener
     public void onBookingCheckedOut(BookingCheckedOutEvent event) {

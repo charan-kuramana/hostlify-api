@@ -70,7 +70,10 @@ app:
     key-id: ${RAZORPAY_KEY_ID:test_key}
     key-secret: ${RAZORPAY_KEY_SECRET:test_secret}
     webhook-secret: ${RAZORPAY_WEBHOOK_SECRET:test_webhook_secret}
-  frontend-url: http://localhost:5173
+  # Public web address: used in links, and as the return page after Stripe / PayPal checkout
+  frontend-url: ${APP_FRONTEND_URL:http://localhost:5173}
+  # Encrypts owners' payment-gateway secrets in the database. Set once and keep it: changing it means owners re-enter keys.
+  gateway-encryption-key: ${GATEWAY_ENCRYPTION_KEY:}
   azure:
     blob:
       connection-string: ${AZURE_BLOB_CONNECTION_STRING:DefaultEndpointsProtocol=https;AccountName=devaccount;AccountKey=devkey;EndpointSuffix=core.windows.net}

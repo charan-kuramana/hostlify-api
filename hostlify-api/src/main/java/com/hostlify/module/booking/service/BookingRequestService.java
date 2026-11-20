@@ -54,13 +54,34 @@ public class BookingRequestService {
         this.floorRepo = floorRepo;
     }
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private ShortStayService shortStays;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    @org.springframework.context.annotation.Lazy
+    private com.hostlify.module.hostel.policy.PolicyService policies;
+
     @Transactional(isolation = Isolation.SERIALIZABLE)
     public BookingRequest createRequest(Long userId, Long profileId, Long hostelId,
                                          Long bedId, LocalDate checkInDate, String notes) {
-        // A resident with an ACTIVE booking can't request a second bed
-        if (profileId != null && checkinRepo.findFirstByHostellerIdAndStatus(profileId, "ACTIVE").isPresent()) {
-            throw new AppException("You already have an active stay. Contact your hostel to change beds.", HttpStatus.CONFLICT);
+        return createRequest(userId, profileId, hostelId, bedId, checkInDate, notes, "MONTHLY", null);
+    }
+
+    /**
+     * A resident may request a bed even while staying somewhere (e.g. moving to another hostel); the app warns
+     * them, and the new hostel can approve only after they have checked out of the current one.
+     */
+    @Transactional(isolation = Isolation.SERIALIZABLE)
+    public BookingRequest createRequest(Long userId, Long profileId, Long hostelId,
+                                         Long bedId, LocalDate checkInDate, String notes, String stayType, LocalDate checkOutDate) {
+        if (profileId != null) {
+            var active = checkinRepo.findFirstByHostellerIdAndStatus(profileId, "ACTIVE").orElse(null);
+            if (active != null && active.getBedId() != null && active.getBedId().equals(bedId)) {
+                throw new AppException("You are already staying in this bed", HttpStatus.CONFLICT);
+            }
         }
+        boolean shortStay = "SHORT".equalsIgnoreCase(stayType);
+        ShortStayService.Quote quote = shortStay ? shortStays.quote(hostelId, bedId, checkInDate, checkOutDate) : null;
         if (checkInDate.isBefore(LocalDate.now())) {
             throw new AppException("Check-in date cannot be in the past", HttpStatus.BAD_REQUEST);
         }
@@ -118,13 +139,22 @@ public class BookingRequestService {
         req.setFloorId(room.getFloorId());
         req.setCheckInDate(checkInDate);
         req.setPreferenceNotes(notes);
+        if (quote != null) {
+            req.setStayType("SHORT");
+            req.setCheckOutDate(checkOutDate);
+            req.setQuotedAmount(quote.amount());
+        }
+        // Freeze the cost of stay + house rules the resident accepted
+        req.setTermsJson(policies.termsSnapshot(hostelId, bedId));
+        req.setTermsAcceptedAt(LocalDateTime.now());
         req.setStatus("PENDING_APPROVAL");
         req.setExpiresAt(expiresAt);
 
         BookingRequest saved = requestRepo.save(req);
 
-        // If no approval required → auto-approve immediately
-        if (!settings.isRequiresAdminApproval()) {
+        // If no approval required → auto-approve immediately (not while the resident still lives elsewhere)
+        boolean livingElsewhere = profileId != null && checkinRepo.findFirstByHostellerIdAndStatus(profileId, "ACTIVE").isPresent();
+        if (!settings.isRequiresAdminApproval() && !livingElsewhere) {
             return approveRequest(saved.getId(), null, null, null, null);
         }
 
@@ -223,10 +253,21 @@ public class BookingRequestService {
         }
         Long bedToAllocate = req.getReassignedBedId() != null ? req.getReassignedBedId() : req.getBedId();
         // Delegate to existing allocateBed (handles pessimistic lock + status transitions)
+        BookingService.ShortStay stay = null;
+        if ("SHORT".equals(req.getStayType()) && req.getCheckOutDate() != null) {
+            // Re-price on the bed actually allocated (staff may have moved the request to another room type)
+            ShortStayService.Quote q = shortStays.quote(req.getHostelId(), bedToAllocate, req.getCheckInDate(), req.getCheckOutDate());
+            BigDecimal amount = monthlyRent != null ? monthlyRent : q.amount(); // staff may override the total
+            stay = new BookingService.ShortStay(req.getCheckOutDate(), q.days(), amount, q.description());
+        }
         BookingCheckin checkin = bookingService.allocateBed(
                 req.getHostellerUserId(), bedToAllocate, req.getCheckInDate(),
-                monthlyRent, advance != null ? advance : BigDecimal.ZERO,
-                paymentMode != null ? paymentMode : "CASH");
+                stay != null ? null : monthlyRent, advance != null ? advance : BigDecimal.ZERO,
+                paymentMode != null ? paymentMode : "CASH", stay);
+        if (req.getTermsJson() != null) {
+            checkin.setTermsJson(req.getTermsJson()); // what the resident agreed to, not today's terms
+            checkinRepo.save(checkin);
+        }
         req.setStatus("APPROVED");
         req.setReviewedByStaffId(staffId);
         req.setBookingCheckinId(checkin.getId());

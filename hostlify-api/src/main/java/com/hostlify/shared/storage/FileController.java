@@ -5,11 +5,18 @@ import com.hostlify.shared.exception.AppException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+/**
+ * Raw blob access by path. Paths are not tied to a tenant, so these are super-admin only; app features
+ * upload and read files through their own endpoints (profile photo, ID proof, listing photos, checklists),
+ * which check hostel access first.
+ */
 @RestController
 @RequestMapping("/api/v1/files")
+@PreAuthorize("hasRole('SUPER_ADMIN')")
 @Tag(name = "File Storage")
 public class FileController {
 

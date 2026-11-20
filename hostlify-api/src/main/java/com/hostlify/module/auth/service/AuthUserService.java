@@ -275,14 +275,17 @@ public class AuthUserService {
         if ("HOSTELLER".equals(user.getRole())) {
             HostellerProfile profile = hostellerProfileRepository.findByAuthUserId(user.getId()).orElse(null);
             if (profile != null) {
-                claims.put("hostelId", profile.getHostelId());
-                claims.put("hostellerProfileId", profile.getId());
                 Long bookingId = bookingCheckinRepository
                         .findFirstByHostellerIdAndStatus(profile.getId(), "ACTIVE")
                         .map(b -> b.getId())
                         .orElse(null);
+                // Hostel access (notices, menu, services …) only while actually staying there; a resident
+                // who checked out keeps their login for receipts and the next booking, not the old hostel's data.
+                Long stayHostelId = bookingId != null ? profile.getHostelId() : null;
+                claims.put("hostelId", stayHostelId);
+                claims.put("hostellerProfileId", profile.getId());
                 claims.put("bookingId", bookingId);
-                response.setHostelId(profile.getHostelId());
+                response.setHostelId(stayHostelId);
                 response.setHostellerProfileId(profile.getId());
                 response.setBookingId(bookingId);
             }

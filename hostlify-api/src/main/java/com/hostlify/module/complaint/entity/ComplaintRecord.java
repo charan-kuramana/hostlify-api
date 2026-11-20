@@ -62,6 +62,33 @@ public class ComplaintRecord extends BaseEntity {
     @Column(name = "resolved_at")
     private LocalDateTime resolvedAt;
 
+    /** When staff first picked it up (status left OPEN). */
+    @Column(name = "acknowledged_at")
+    private LocalDateTime acknowledgedAt;
+
+    /** Target time to fix it, from the hostel's per-category SLA. */
+    @Column(name = "due_at")
+    private LocalDateTime dueAt;
+
+    @Column(name = "resident_rating")
+    private Short residentRating;
+
+    @Column(name = "resident_feedback", length = 500)
+    private String residentFeedback;
+
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    @Column(name = "overdue_alerted", nullable = false)
+    private boolean overdueAlerted = false;
+
     @Transient private String hostellerName;
     @Transient private String roomNumber;
+
+    /** Still open past its target time (or resolved after it). */
+    @com.fasterxml.jackson.annotation.JsonProperty("overdue")
+    public boolean isOverdue() {
+        if (dueAt == null) return false;
+        // Same clock as createdAt / resolvedAt (JVM default zone)
+        LocalDateTime end = resolvedAt != null ? resolvedAt : LocalDateTime.now();
+        return end.isAfter(dueAt);
+    }
 }

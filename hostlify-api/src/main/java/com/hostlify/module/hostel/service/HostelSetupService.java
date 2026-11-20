@@ -11,6 +11,10 @@ import java.util.*;
 @Service
 public class HostelSetupService {
 
+    /** Plan limits (Section 6): adding beds is checked against the owner's plan. */
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.hostlify.module.platform.PlanService planService;
+
     private final HostelAmenityRepository amenityRepo;
     private final HostelPricingRepository pricingRepo;
     private final HostelBookingSettingRepository settingRepo;
@@ -91,10 +95,22 @@ public class HostelSetupService {
                 throw new com.hostlify.shared.exception.AppException("Deposit months must be 0–12 and late fee cannot be negative",
                         org.springframework.http.HttpStatus.BAD_REQUEST);
             }
+            // Short-stay rates (optional): per day, per 7 days, per 15 days
+            if (t.containsKey("dailyRent")) pricing.setDailyRent(money(t.get("dailyRent")));
+            if (t.containsKey("weeklyRent")) pricing.setWeeklyRent(money(t.get("weeklyRent")));
+            if (t.containsKey("fortnightRent")) pricing.setFortnightRent(money(t.get("fortnightRent")));
             pricing.setActive(true);
             saved.add(pricingRepo.save(pricing));
         }
         return saved;
+    }
+
+    private static BigDecimal money(Object v) {
+        if (v == null || v.toString().isBlank()) return null;
+        BigDecimal b;
+        try { b = new BigDecimal(v.toString().trim()); } catch (NumberFormatException e) { throw new com.hostlify.shared.exception.AppException("Short-stay rates must be numbers", org.springframework.http.HttpStatus.BAD_REQUEST); }
+        if (b.signum() < 0) throw new com.hostlify.shared.exception.AppException("Short-stay rates cannot be negative", org.springframework.http.HttpStatus.BAD_REQUEST);
+        return b.signum() == 0 ? null : b;
     }
 
     // ── Booking Settings ────────────────────────────────────────────────────────
@@ -118,6 +134,13 @@ public class HostelSetupService {
             settings.setMaxPendingPerBed(((Number) body.get("maxPendingPerBed")).intValue());
         if (body.containsKey("geolocationRadiusKm"))
             settings.setGeolocationRadiusKm(new BigDecimal(body.get("geolocationRadiusKm").toString()));
+        if (body.containsKey("shortStayEnabled"))
+            settings.setShortStayEnabled(Boolean.TRUE.equals(body.get("shortStayEnabled")));
+        if (body.get("shortStayMinDays") != null) settings.setShortStayMinDays(((Number) body.get("shortStayMinDays")).intValue());
+        if (body.get("shortStayMaxDays") != null) settings.setShortStayMaxDays(((Number) body.get("shortStayMaxDays")).intValue());
+        if (settings.getShortStayMinDays() < 1 || settings.getShortStayMaxDays() > 90 || settings.getShortStayMinDays() > settings.getShortStayMaxDays()) {
+            throw new com.hostlify.shared.exception.AppException("Short stays: minimum 1 day, maximum 90 days, and minimum must not exceed maximum", org.springframework.http.HttpStatus.BAD_REQUEST);
+        }
         return settingRepo.save(settings);
     }
 
@@ -231,6 +254,7 @@ public class HostelSetupService {
         room.setRoomName((String) body.get("roomNumber"));
         room.setRoomType((String) body.getOrDefault("roomType", "SINGLE"));
         int bedsPerRoom = body.get("bedsPerRoom") != null ? ((Number) body.get("bedsPerRoom")).intValue() : 1;
+        planService.requireBedCapacity(hostelId, bedsPerRoom);
         room.setCapacity(bedsPerRoom);
         room.setCurrentOccupancy(0);
         if (body.get("rentAmount") != null) {

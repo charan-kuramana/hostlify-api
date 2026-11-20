@@ -242,6 +242,20 @@ public class ChecklistService {
         return c;
     }
 
+    /** Move-in and move-out photos of a booking (submitted checklists only), so deposit deductions can point to them. */
+    public List<Map<String, Object>> photosForBooking(Long bookingId) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (String kind : List.of("MOVE_IN", "MOVE_OUT")) {
+            repo.findFirstByBookingIdAndKind(bookingId, kind).filter(c -> !"DRAFT".equals(c.getStatus())).ifPresent(c ->
+                    photoRepo.findByChecklistIdOrderByIdAsc(c.getId()).forEach(p -> {
+                        Map<String, Object> m = photoView(p);
+                        m.put("kind", kind);
+                        out.add(m);
+                    }));
+        }
+        return out;
+    }
+
     private Map<String, Object> photoView(ChecklistPhoto p) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("id", p.getId());

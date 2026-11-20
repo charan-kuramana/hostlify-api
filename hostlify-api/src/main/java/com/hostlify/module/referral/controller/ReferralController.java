@@ -43,6 +43,9 @@ public class ReferralController {
         return ApiResponse.ok(referralService.getMyReferrals(p.getHostellerProfileId()));
     }
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.hostlify.module.hosteller.repository.HostellerProfileRepository profileRepo;
+
     @PostMapping("/validate")
     @Operation(summary = "Apply a referral code for a hosteller (called during registration)")
     public ApiResponse<String> validateCode(@RequestBody Map<String, String> body) {
@@ -58,6 +61,8 @@ public class ReferralController {
             } catch (NumberFormatException e) {
                 throw new AppException("hostellerId is required", HttpStatus.BAD_REQUEST);
             }
+            var prof = profileRepo.findById(hostellerId).orElseThrow(() -> new AppException("Resident not found", HttpStatus.NOT_FOUND));
+            com.hostlify.shared.security.HostelAccess.requireHostellerRecord(prof.getId(), prof.getHostelId(), false);
         } else {
             throw new AppException("Access denied", HttpStatus.FORBIDDEN);
         }

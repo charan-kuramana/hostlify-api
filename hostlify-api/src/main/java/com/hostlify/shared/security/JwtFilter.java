@@ -37,6 +37,7 @@ public class JwtFilter extends OncePerRequestFilter {
         String path = request.getRequestURI();
         return path.startsWith("/api/v1/auth/")
                 || path.startsWith("/api/payment/razorpay/webhook")
+                || path.startsWith("/api/payment/gateway/webhook/")
                 || path.startsWith("/actuator/")
                 || path.startsWith("/swagger-ui")
                 || path.startsWith("/v3/api-docs");

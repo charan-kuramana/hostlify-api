@@ -67,6 +67,10 @@ public class HostelPaymentSetting {
     @Column(name = "late_fee_max_amount", precision = 12, scale = 2)
     private BigDecimal lateFeeMaxAmount;
 
+    /** Owner's choice: electricity, water and Wi-Fi are part of the rent (default) or billed separately. */
+    @Column(name = "utilities_included", nullable = false)
+    private boolean utilitiesIncluded = true;
+
     @Column(name = "upi_id", length = 100)
     private String upiId;
 

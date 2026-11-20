@@ -48,6 +48,7 @@ public class MenuController {
     @PreAuthorize("hasAnyRole('HOSTELLER','HOSTEL_STAFF')")
     @Operation(summary = "Get menu items for a weekly menu")
     public ApiResponse<List<MenuItem>> getItems(@PathVariable Long menuId) {
+        com.hostlify.shared.security.HostelAccess.requireHostelMember(menuService.hostelOfMenu(menuId));
         return ApiResponse.ok(menuService.getMenuItems(menuId));
     }
 

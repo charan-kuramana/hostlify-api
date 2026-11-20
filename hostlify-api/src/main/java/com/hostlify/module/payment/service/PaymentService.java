@@ -151,6 +151,10 @@ public class PaymentService {
         if (amount == null || amount.signum() <= 0 || amount.compareTo(new BigDecimal("1000000")) > 0) {
             throw new AppException("Amount must be between 1 and 10,00,000", HttpStatus.BAD_REQUEST);
         }
+        if ("ELECTRICITY".equals(type) && settingsService.getOrDefault(hostelId).isUtilitiesIncluded()) {
+            throw new AppException("Electricity is included in rent for this hostel. Turn on \"Bill electricity / water separately\" "
+                    + "in Settings → Payments to charge it.", HttpStatus.BAD_REQUEST);
+        }
         if (description != null && description.length() > 300) description = description.substring(0, 300);
         LocalDate due = dueDate != null ? dueDate : DateUtils.todayKolkata();
 
@@ -324,6 +328,52 @@ public class PaymentService {
         details.put("dueId", rpOrder.getDueId());
         if (due != null) details.put("period", due.getPeriodMonth() + "/" + due.getPeriodYear());
         return details;
+    }
+
+    // ─── Owner's own gateways (Razorpay / Stripe / PayPal) ──────────────────
+
+    /** A resident's own unpaid due and what can still be paid online (excludes UPI payments awaiting confirmation). */
+    public record OnlineDue(PaymentDue due, HostellerProfile profile, String email, BigDecimal outstanding) {}
+
+    public OnlineDue onlineDue(Long authUserId, Long dueId) {
+        HostellerProfile profile = profileRepo.findByAuthUserId(authUserId)
+                .orElseThrow(() -> new AppException("Profile not found", HttpStatus.NOT_FOUND));
+        PaymentDue due = getDue(dueId);
+        if (!Objects.equals(due.getHostellerId(), profile.getId())) throw new AppException("Access denied", HttpStatus.FORBIDDEN);
+        if ("PAID".equals(due.getStatus())) throw new AppException("This due is already paid", HttpStatus.CONFLICT);
+        BigDecimal outstanding = due.getRentAmount().subtract(paidSoFar(dueId)).subtract(pendingVerification(dueId));
+        if (outstanding.signum() <= 0) {
+            throw new AppException("Nothing left to pay on this due (a payment may be waiting for confirmation)", HttpStatus.CONFLICT);
+        }
+        String email = authUserRepo.findById(authUserId).map(u -> u.getEmail()).orElse(null);
+        return new OnlineDue(due, profile, email, outstanding);
+    }
+
+    /** Records money received through an owner's gateway. Callers must make this idempotent (one call per order). */
+    @Transactional
+    public PaymentRecord recordOnlinePayment(Long hostellerId, Long dueId, BigDecimal amount, String provider,
+                                             String providerPaymentId, String providerOrderId) {
+        PaymentDue due = dueRepo.findById(dueId).orElse(null);
+        PaymentRecord record = new PaymentRecord();
+        record.setHostellerId(hostellerId);
+        record.setDueId(dueId);
+        record.setAmount(amount);
+        record.setPaymentMethod(provider);
+        record.setTransactionRef(providerPaymentId);
+        if ("RAZORPAY".equals(provider)) {
+            record.setRazorpayPaymentId(providerPaymentId);
+            record.setRazorpayOrderId(providerOrderId);
+        }
+        record.setPaymentDate(DateUtils.todayKolkata());
+        record.setStatus(PaymentRecord.STATUS_SUCCESS);
+        record.setNotes("Paid online via " + provider.charAt(0) + provider.substring(1).toLowerCase() + " to the hostel's account");
+        if (due != null) record.setHostelId(due.getHostelId());
+        PaymentRecord saved = recordRepo.save(record);
+        if (due != null) {
+            refreshDueStatus(due);
+            publishPaymentReceived(saved, due, profileRepo.findById(hostellerId).orElse(null));
+        }
+        return saved;
     }
 
     // ─── Direct UPI (to the owner's own UPI ID, no gateway fee) ─────────────
@@ -628,6 +678,7 @@ public class PaymentService {
         LocalDate dueDate = rentDueDate(hostelId, month, year);
         int count = 0;
         for (BookingCheckin booking : activeBookings) {
+            if ("SHORT".equals(booking.getRentFrequency())) continue; // short stays are billed once for the whole stay
             // Skip if this resident already has a RENT due for the period (other charges don't count)
             boolean exists = dueRepo.findRentDue(booking.getHostellerId(), year, month).isPresent();
             if (!exists) {

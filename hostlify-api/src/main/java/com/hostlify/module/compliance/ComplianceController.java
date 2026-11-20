@@ -265,6 +265,29 @@ public class ComplianceController {
         return ApiResponse.ok(settlements.markRefunded(id, (String) body.get("method"), (String) body.get("reference")), "Refund recorded");
     }
 
+    @PostMapping("/settlements/{id}/dispute")
+    @PreAuthorize("hasRole('HOSTELLER')")
+    @Operation(summary = "Resident: disagree with a deposit settlement (staff and owner are alerted)")
+    public ApiResponse<DepositSettlement> dispute(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        return ApiResponse.ok(settlements.dispute(id, myProfileId(), (String) body.get("reason")), "Sent to the hostel");
+    }
+
+    @PostMapping("/settlements/{id}/dispute/resolve")
+    @PreAuthorize("hasRole('HOSTEL_STAFF')")
+    @Operation(summary = "Owner/Admin/Manager: reply to a dispute; optionally give up part of the deductions")
+    public ApiResponse<DepositSettlement> resolveDispute(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        HostelAccess.requireStaffHostel(settlements.get(id).getHostelId());
+        HostelAccess.requireSubRole(MANAGERS);
+        java.math.BigDecimal waive;
+        try {
+            waive = body.get("waiveAmount") == null || String.valueOf(body.get("waiveAmount")).isBlank()
+                    ? java.math.BigDecimal.ZERO : new java.math.BigDecimal(String.valueOf(body.get("waiveAmount")));
+        } catch (NumberFormatException e) {
+            throw new AppException("Amount must be a number", HttpStatus.BAD_REQUEST);
+        }
+        return ApiResponse.ok(settlements.resolveDispute(id, (String) body.get("response"), waive), "Reply sent");
+    }
+
     @GetMapping(value = "/settlements/{id}/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
     @PreAuthorize("hasAnyRole('HOSTELLER','HOSTEL_STAFF')")
     public ResponseEntity<byte[]> settlementPdf(@PathVariable Long id) {
@@ -286,6 +309,7 @@ public class ComplianceController {
         m.put("agreements", agreements.forResident(id).stream().filter(a -> !"VOID".equals(a.getStatus())).toList());
         m.put("checklists", checklists.forResident(id).stream().filter(c -> !"DRAFT".equals(c.getStatus())).toList());
         m.put("settlements", settlements.forResident(id));
+        m.put("pendingDeposits", settlements.pendingForResident(id));
         return ApiResponse.ok(m);
     }
 

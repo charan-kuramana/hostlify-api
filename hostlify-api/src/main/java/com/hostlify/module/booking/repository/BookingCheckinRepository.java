@@ -14,4 +14,5 @@ public interface BookingCheckinRepository extends JpaRepository<BookingCheckin, 
     Optional<BookingCheckin> findByBedIdAndStatus(Long bedId, String status);
     List<BookingCheckin> findByHostelIdOrderByCreatedAtDesc(Long hostelId);
     List<BookingCheckin> findByHostellerIdOrderByCreatedAtDesc(Long hostellerId);
+    List<BookingCheckin> findByStatusAndCheckoutDateGreaterThanEqual(String status, java.time.LocalDate from);
 }

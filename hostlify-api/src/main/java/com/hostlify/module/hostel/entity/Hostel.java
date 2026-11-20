@@ -67,6 +67,10 @@ public class Hostel extends BaseEntity {
     @Column(name = "default_rent", nullable = false, precision = 12, scale = 2)
     private BigDecimal defaultRent = BigDecimal.ZERO;
 
+    /** Owner's choice: show this hostel under "Nearby" only to people within this many km (1-50). */
+    @Column(name = "discovery_radius_km", nullable = false)
+    private int discoveryRadiusKm = 10;
+
     @Column(name = "online_payment_enabled", nullable = false)
     private boolean onlinePaymentEnabled = true;
 

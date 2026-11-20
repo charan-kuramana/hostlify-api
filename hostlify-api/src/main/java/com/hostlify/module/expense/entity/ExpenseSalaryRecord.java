@@ -54,4 +54,17 @@ public class ExpenseSalaryRecord extends BaseEntity {
 
     @Column(name = "paid_at")
     private LocalDateTime paidAt;
+
+    /** Attendance snapshot the salary was based on (null for salaries recorded before attendance existed). */
+    @Column(name = "days_in_month")
+    private Integer daysInMonth;
+
+    @Column(name = "paid_days", precision = 5, scale = 1)
+    private BigDecimal paidDays;
+
+    @Column(name = "absent_days", precision = 5, scale = 1)
+    private BigDecimal absentDays;
+
+    @Column(name = "deduction_note", length = 200)
+    private String deductionNote;
 }

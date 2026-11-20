@@ -12,4 +12,10 @@ public interface ComplaintRecordRepository extends JpaRepository<ComplaintRecord
     List<ComplaintRecord> findByHostelIdAndStatus(Long hostelId, String status);
     List<ComplaintRecord> findByHostelIdAndPriority(Long hostelId, String priority);
     List<ComplaintRecord> findByHostelIdOrderByCreatedAtDesc(Long hostelId);
+    List<ComplaintRecord> findByStatusInAndDueAtBeforeAndOverdueAlertedFalse(List<String> statuses, java.time.LocalDateTime before);
+    List<ComplaintRecord> findByHostelIdAndCreatedAtAfter(Long hostelId, java.time.LocalDateTime after);
+
+    interface SlaTargets extends JpaRepository<com.hostlify.module.complaint.entity.ComplaintSlaTarget, Long> {
+        List<com.hostlify.module.complaint.entity.ComplaintSlaTarget> findByHostelId(Long hostelId);
+    }
 }
